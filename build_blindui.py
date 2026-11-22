@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 MAX_BUNDLE_BYTES = 28672
+MAX_KIT_BYTES = 8192
+MAX_TOKENS_BYTES = 4096
 
 # Constructed dynamically so this file itself never contains raw sink literals.
 _FORBIDDEN_SUBSTRINGS: Tuple[Tuple[str, str], ...] = (
@@ -631,15 +633,24 @@ def minify_js(src: str, mangle: bool = True) -> str:
     return "".join(out) + "\n"
 
 
-def validate_bundle_text(text: str, label: str, enforce_size: bool = False) -> List[str]:
+def validate_bundle_text(
+    text: str,
+    label: str,
+    enforce_size: bool = False,
+    max_bytes: int = MAX_BUNDLE_BYTES,
+    inclusive: bool = False,
+) -> List[str]:
     """Validate ASCII, forbidden sinks, dot-clamp, and size budget."""
     errors: List[str] = []
     raw = text.encode("utf-8")
     non_ascii = sum(1 for b in raw if b > 0x7F)
     if non_ascii > 0:
         errors.append(f"{label}: found {non_ascii} non-ASCII byte(s)")
-    if enforce_size and len(raw) >= MAX_BUNDLE_BYTES:
-        errors.append(f"{label}: {len(raw)} bytes >= budget {MAX_BUNDLE_BYTES} bytes")
+    if enforce_size:
+        if inclusive and len(raw) > max_bytes:
+            errors.append(f"{label}: {len(raw)} bytes > budget {max_bytes} bytes")
+        elif not inclusive and len(raw) >= max_bytes:
+            errors.append(f"{label}: {len(raw)} bytes >= budget {max_bytes} bytes")
     low = text.lower()
     for name, needle in _FORBIDDEN_SUBSTRINGS:
         if needle.lower() in low:
@@ -647,6 +658,52 @@ def validate_bundle_text(text: str, label: str, enforce_size: bool = False) -> L
     if _FORBIDDEN_CLAMP_RE.search(text):
         errors.append(f"{label}: forbidden dot-clamp call detected")
     return errors
+
+
+def validate_css_tokens(path: Path, max_bytes: int = MAX_TOKENS_BYTES) -> dict:
+    """Validate blindui-tokens.css for ASCII, forbidden literals, balanced braces, and size cap."""
+    errors: List[str] = []
+    if not path.is_file():
+        return {
+            "ok": False,
+            "path": str(path),
+            "bytes": 0,
+            "budget_bytes": max_bytes,
+            "headroom_bytes": max_bytes,
+            "sha256": "",
+            "errors": [f"Tokens CSS not found: {path}"],
+        }
+    raw = path.read_bytes()
+    text = raw.decode("utf-8", errors="replace")
+    errors.extend(
+        validate_bundle_text(
+            text,
+            str(path.name),
+            enforce_size=True,
+            max_bytes=max_bytes,
+            inclusive=True,
+        )
+    )
+    depth = 0
+    for ch in text:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                errors.append(f"{path.name}: unbalanced closing brace")
+                break
+    if depth > 0:
+        errors.append(f"{path.name}: {depth} unclosed brace(s)")
+    return {
+        "ok": len(errors) == 0,
+        "path": str(path),
+        "bytes": len(raw),
+        "budget_bytes": max_bytes,
+        "headroom_bytes": max_bytes - len(raw),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "errors": errors,
+    }
 
 
 def run_node_check(js_text: str, label: str, require_node: bool = False) -> List[str]:
@@ -681,6 +738,8 @@ def build_and_verify(
     check_only: bool = False,
     sync_paths: Optional[List[Path]] = None,
     require_node: bool = False,
+    max_bytes: int = MAX_BUNDLE_BYTES,
+    inclusive: bool = False,
 ) -> dict:
     errors: List[str] = []
     if not src_path.is_file():
@@ -695,7 +754,15 @@ def build_and_verify(
     if min_1 != min_2:
         errors.append("Minifier non-determinism detected across repeated runs")
 
-    errors.extend(validate_bundle_text(min_1, str(out_path.name), enforce_size=True))
+    errors.extend(
+        validate_bundle_text(
+            min_1,
+            str(out_path.name),
+            enforce_size=True,
+            max_bytes=max_bytes,
+            inclusive=inclusive,
+        )
+    )
     errors.extend(run_node_check(min_1, str(out_path.name), require_node=require_node))
 
     min_bytes = min_1.encode("ascii", errors="replace")
@@ -722,8 +789,8 @@ def build_and_verify(
         "ok": len(errors) == 0,
         "src_bytes": len(src_text.encode("utf-8")),
         "min_bytes": len(min_bytes),
-        "budget_bytes": MAX_BUNDLE_BYTES,
-        "headroom_bytes": MAX_BUNDLE_BYTES - len(min_bytes),
+        "budget_bytes": max_bytes,
+        "headroom_bytes": max_bytes - len(min_bytes),
         "sha256": sha256_hex,
         "check_only": check_only,
         "targets": [str(t) for t in targets],
@@ -734,35 +801,99 @@ def build_and_verify(
 def main(argv: Optional[List[str]] = None) -> int:
     here = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Deterministic pure-Python BlindUI minifier & verifier")
-    parser.add_argument("--src", default=str(here / "blindui.js"), help="Path to readable blindui.js")
-    parser.add_argument("--out", default=str(here / "blindui.min.js"), help="Output path for blindui.min.js")
+    parser.add_argument("--src", default=None, help="Path to readable JS source (default: build core + kit + tokens)")
+    parser.add_argument("--out", default=None, help="Output path for minified JS bundle")
+    parser.add_argument("--max-bytes", type=int, default=None, help="Override size budget in bytes for single-target builds")
     parser.add_argument("--check", action="store_true", help="Verify existing bundle(s) match build byte-for-byte")
     parser.add_argument("--sync", nargs="*", default=[], help="Additional vendored blindui.min.js paths to sync/check")
     parser.add_argument("--require-node", action="store_true", help="Fail if node binary is missing for --check")
     parser.add_argument("--json", action="store_true", help="Print JSON summary")
     args = parser.parse_args(argv)
 
-    result = build_and_verify(
-        src_path=Path(args.src),
-        out_path=Path(args.out),
+    single_mode = args.src is not None or args.out is not None
+    if single_mode:
+        src_path = Path(args.src) if args.src else (here / "blindui.js")
+        out_path = Path(args.out) if args.out else (here / "blindui.min.js")
+        budget = args.max_bytes if args.max_bytes is not None else MAX_BUNDLE_BYTES
+        inclusive = args.max_bytes is not None
+        result = build_and_verify(
+            src_path=src_path,
+            out_path=out_path,
+            check_only=args.check,
+            sync_paths=[Path(p) for p in args.sync],
+            require_node=args.require_node,
+            max_bytes=budget,
+            inclusive=inclusive,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            if result["ok"]:
+                op = "<=" if inclusive else "<"
+                print(
+                    f"OK: {out_path.name} {result['min_bytes']} bytes "
+                    f"({op} {result['budget_bytes']}B, headroom {result['headroom_bytes']}B, "
+                    f"sha256={result['sha256'][:16]})"
+                )
+            else:
+                for err in result["errors"]:
+                    print(f"FAIL: {err}", file=sys.stderr)
+        return 0 if result["ok"] else 1
+
+    core_res = build_and_verify(
+        src_path=here / "blindui.js",
+        out_path=here / "blindui.min.js",
         check_only=args.check,
         sync_paths=[Path(p) for p in args.sync],
         require_node=args.require_node,
+        max_bytes=MAX_BUNDLE_BYTES,
+        inclusive=False,
     )
+    kit_src = here / "blindui-kit.js"
+    kit_out = here / "blindui-kit.min.js"
+    kit_res = build_and_verify(
+        src_path=kit_src,
+        out_path=kit_out,
+        check_only=args.check,
+        require_node=args.require_node,
+        max_bytes=MAX_KIT_BYTES,
+        inclusive=True,
+    )
+    tokens_path = here / "blindui-tokens.css"
+    tokens_res = validate_css_tokens(tokens_path, max_bytes=MAX_TOKENS_BYTES)
 
+    all_errors = list(core_res["errors"]) + list(kit_res["errors"]) + list(tokens_res["errors"])
+    combined = {
+        "ok": len(all_errors) == 0,
+        "core": core_res,
+        "kit": kit_res,
+        "tokens": tokens_res,
+        "errors": all_errors,
+    }
     if args.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps(combined, indent=2))
     else:
-        if result["ok"]:
+        if core_res["ok"]:
             print(
-                f"OK: blindui.min.js {result['min_bytes']} bytes "
-                f"(< {result['budget_bytes']}B, headroom {result['headroom_bytes']}B, "
-                f"sha256={result['sha256'][:16]})"
+                f"OK: blindui.min.js {core_res['min_bytes']} bytes "
+                f"(< {core_res['budget_bytes']}B, headroom {core_res['headroom_bytes']}B, "
+                f"sha256={core_res['sha256'][:16]})"
             )
-        else:
-            for err in result["errors"]:
-                print(f"FAIL: {err}", file=sys.stderr)
-    return 0 if result["ok"] else 1
+        if kit_res["ok"]:
+            print(
+                f"OK: blindui-kit.min.js {kit_res['min_bytes']} bytes "
+                f"(<= {kit_res['budget_bytes']}B, headroom {kit_res['headroom_bytes']}B, "
+                f"sha256={kit_res['sha256'][:16]})"
+            )
+        if tokens_res["ok"]:
+            print(
+                f"OK: blindui-tokens.css {tokens_res['bytes']} bytes "
+                f"(<= {tokens_res['budget_bytes']}B, headroom {tokens_res['headroom_bytes']}B, "
+                f"sha256={tokens_res['sha256'][:16]})"
+            )
+        for err in all_errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+    return 0 if combined["ok"] else 1
 
 
 if __name__ == "__main__":

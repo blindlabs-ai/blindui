@@ -388,11 +388,44 @@ class TestBlindUiCheckCounterfactuals(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn('"ok": true', proc.stdout)
 
+    def test_developers_surface_and_sso_route_parity(self) -> None:
+        js_sso = (
+            "function doSso() {\n"
+            "  return fetch('/mail/api/v1/auth/login', { method: 'POST' });\n"
+            "}\n"
+        )
+        ui_p, srv_p = self._write_pair(_make_clean_ui_py(js_extra=js_sso), _make_clean_server_py())
+        rep = bc.check_app(ui_p, srv_p, "developers", blindui_path=self.bundle)
+        self.assertTrue(rep["ok"], rep["findings"])
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(HERE / "blindui_check.py"),
+                "--ui", str(ui_p),
+                "--server", str(srv_p),
+                "--surface", "developers",
+                "--blindui", str(self.bundle),
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn('"surface": "developers"', proc.stdout)
+        self.assertIn('"ok": true', proc.stdout)
+
+        # Unknown /mail/api/v1/auth/ route still fails BUI-05
+        js_bad = "function badSso() { return fetch('/mail/api/v1/auth/nonexistent', { method: 'POST' }); }\n"
+        ui_b, srv_b = self._write_pair(_make_clean_ui_py(js_extra=js_bad), _make_clean_server_py())
+        rep_b = bc.check_app(ui_b, srv_b, "developers")
+        self.assertIn("BUI-05", self._rules(rep_b))
+
     def test_real_apps_zero_false_positives_when_present(self) -> None:
         apps_root_env = os.environ.get("BLINDUI_APPS_DIR", "").strip()
         if not apps_root_env:
-            # Verify zero false positives on clean synthetic fixtures for all four surfaces.
-            for surface in ("social", "finance", "mail", "sign"):
+            # Verify zero false positives on clean synthetic fixtures for all five surfaces.
+            for surface in ("social", "finance", "mail", "sign", "developers"):
                 ui_p, srv_p = self._write_pair(
                     _make_clean_ui_py(),
                     _make_clean_server_py(),
