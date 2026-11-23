@@ -190,14 +190,14 @@
           for (let i = 0; i < ln(t);) {
             let c = t[i], m, b, e, k, r, j;
             if (RB.test(c)) i++;
-            else if ((m = RF.exec(c))) {
+            else if (m = RF.exec(c)) {
               for (b = [], k = ln(m[1]), i++; i < ln(t); i++) {
                 if ((j = RC.exec(t[i])) && ln(j[1]) >= k) { i++; break; }
                 b.push(t[i]);
               }
               e = E(E(u, "pre"), _c, b.join(_n));
               RG.test(r = m[2].trim()) && sa(e, "data-lang", r);
-            } else if ((m = RH.exec(c))) { Q(m[2], E(u, "h" + ln(m[1])), x); i++; }
+            } else if (m = RH.exec(c)) { Q(m[2], E(u, "h" + ln(m[1])), x); i++; }
             else if (RR.test(c)) { E(u, _h); i++; }
             else if (c[0] == ">") {
               for (b = []; i < ln(t) && t[i][0] == ">";) { r = t[i++]; b.push(sl(r, r[1] == " " ? 2 : 1)); }
@@ -301,7 +301,18 @@
     /* Lossless block parser & serializer for BlindUI.notionEditor (bit-exact roundtrip). */
     parseN = (s) => {
       let L = s.split(/(\r?\n)/), b = [], g = "", i = 0, c, e, m, f, r, p, a, q,
-        P = (k, m, v, r, q) => (b.push(mkB(q, k, m, v, g, r)), g = p),
+        P = (k, m, v, r, q) => {
+          if (!ln(b) && /^\n+$/.test(g)) {
+            let n0 = Math.min(ln(g), 40);
+            for (let j = 0; j < n0; j++) b.push(mkB(0, _p, "", "", j ? _n : ""));
+            g = sl(g, n0 - 1);
+          } else if (ln(b) && /^\n{3,}$/.test(g)) {
+            let n0 = Math.min(ln(g) - 2, 40);
+            for (let j = 0; j < n0; j++) b.push(mkB(0, _p, "", "", j ? _n : _n + _n));
+            g = sl(g, n0 + 1);
+          }
+          b.push(mkB(q, k, m, v, g, r)); g = p;
+        },
         W = (fn, x) => {
           for (r = c, a = x ? [] : [x === 0 ? sl(c, c[1] == " " ? 2 : 1) : c]; i < ln(L) && fn(c = L[i]);) {
             r += p + c; p = L[i + 1] || ""; i += 2;
@@ -409,7 +420,7 @@
         if (!hasAnc(u, n, _st) && (m = /\*\*([^\s*\n](?:[^*\n]*[^\s*\n])?)\*\*$/.exec(s))) return [m.index, _st, m[1]];
         if (!hasAnc(u, n, "em") && (m = /(^|[^*])\*([^\s*\n](?:[^*\n]*[^\s*\n])?)\*$/.exec(s))) return [m.index + ln(m[1]), "em", m[2]];
       } else if (c == 96) {
-        if ((m = /`([^`\n]+)`$/.exec(s))) return [m.index, _c, m[1]];
+        if (m = /`([^`\n]+)`$/.exec(s)) return [m.index, _c, m[1]];
       } else if (c == 41 && !hasAnc(u, n, "a")) {
         for (k = ln(s) - 1; k >= 0; k--) {
           let x = cc(s, k);
@@ -570,16 +581,40 @@
         let a = o.textarea || o.textareaId && byId(o.textareaId) || N, u = N,
           p = isS(o.placeholder) ? o.placeholder : "", r = !!o.readOnly, w = o.mdOpts,
           X = w?.maxDepth >= 1 ? Math.min(w.maxDepth, 16) : 8,
+          maxR = o.maxRows > 0 ? Math.min(o.maxRows, 200) : 40,
           f = isF(o.onChange) ? [o.onChange] : [],
           B = [], g = "", W = [], A = -1, V = N, L = 0, Q = [0, 0], q = false, S0 = N, C0 = false, h = BUI.h,
           T = () => a || u,
           M = (x) => sa(c, "data-bui-mode", x),
           K = (x, j = ln(B) - 1, i = 0) => x < i ? i : x > j ? j : x,
-          U = (b, k, m, v) => { b.k = k; b.m = m; v != N && (b.v = v); b.r = N; b.q = 0; },
+          syncG = (i, u) => {
+            let p = B[i], nx = B[i + 1];
+            if (!p || !nx) return;
+            let ne = p.k != _p || p.v;
+            if (ne && nx.g == _n && !isL(nx.k) && (u || p.k == _p)) nx.g = _n + _n;
+            else if (!ne && nx.g == _n + _n) nx.g = _n;
+          },
+          mat0 = (i) => { for (let j = 0; j <= i; j++) B[j].q = 0; },
+          mat = (i, w0) => { mat0(i); syncG(i, !w0); },
+          eh = (z, b) => {
+            let t = z?._ed, s;
+            if (!r && b.k == _p && t && t.style && isF(R?.getComputedStyle)) {
+              s = R.getComputedStyle(t);
+              if (s && (s.minHeight == "0px" || s.minHeight == "auto")) { t.style.minHeight = "24px"; t.style.margin = "0"; }
+            }
+          },
+          U = (b, k, m, v) => {
+            let w0 = b.k != _p || b.v, j = ix(B, b);
+            b.k = k; b.m = m; v != N && (b.v = v); b.r = N; b.q = 0;
+            j >= 0 && ((b.k != _p || b.v) ? mat(j, w0) : syncG(j));
+          },
           O = (t) => { let s = t?.style; s && (s.height = "auto", t.scrollHeight > 0 && (s.height = t.scrollHeight + "px")); },
           G = () => q ? T()?.value || "" : B.reduce((s, b) => b.q ? s : s + b.g + serN(b), "") + g,
           E = () => {
-            ln(B) == 1 && B[0].k == _p && !B[0].v && B[0].r == N && (g = "");
+            if (B.every((b) => b.k == _p && !b.v && b.r == N)) {
+              g = "";
+              for (let j = 1; j < ln(B); j++) B[j].q = 1;
+            }
             let s = G();
             a && !q && (a.value = s);
             [...f].map((x) => x(s));
@@ -628,20 +663,22 @@
           I = (i, b, x) => {
             let z = mkW(b);
             B.splice(i, 0, b); W.splice(i, 0, z);
+            syncG(i);
             c.insertBefore ? ins(c, z, W[i + 1] || N) : (clr(c), W.map((y) => ap(c, y)));
-            H0(); x && Y(i, 0, 0, 1);
+            eh(z, b); H0(); x && Y(i, 0, 0, 1);
           },
           D = (i) => {
             B.splice(i, 1);
             let z = W.splice(i, 1)[0];
             z?.parentNode == c && rm(c, z);
+            i > 0 && syncG(i - 1, 1);
             H0();
           },
-          Z = () => { S0 = N; clr(c); W = B.map((b) => ap(c, mkW(b))); H0(); },
+          Z = () => { S0 = N; clr(c); W = B.map((b) => { let z = ap(c, mkW(b)); eh(z, b); return z; }); H0(); },
           R0 = (i, m) => {
             let b = B[i];
             U(b, _p, "");
-            i && b.g == _n && (b.g += _n);
+            i && syncG(i - 1, 1);
             m && (b.q = 1);
             P(W[i], b); H0(); Y(i, 0, 0, 1);
           },
@@ -701,7 +738,7 @@
               t = h("textarea", {
                 className: _nb + "-inp", rows: 1, spellcheck: false, value: b.v,
                 onfocus: onF, onblur: onB, onkeyup: sv, onmouseup: sv,
-                oninput: J(b, (i) => { let [v, x, y] = sel(t); L = i; Q = [x, y]; b.v = v; b.r = N; v && (b.q = 0); O(t); E(); }),
+                oninput: J(b, (i) => { let [v, x, y] = sel(t); L = i; Q = [x, y]; b.v = v; b.r = N; v && mat(i, 1); O(t); E(); }),
                 onkeydown: J(b, (i, e) => {
                   let y = e.key || "", [v, x, j] = sel(t);
                   L = i; Q = [x, j];
@@ -717,11 +754,11 @@
               sv = (i) => { L = i; inS(t) && (Q = gS(t, b)); },
               inp = (i) => {
                 if (C0) return;
-                let v = serDom(t), e, j;
+                let v = serDom(t), e, j, w0 = b.k != _p || b.v;
                 if (!v && ln(ch(t))) { clr(t); sS(t, 0, 0); }
                 if (b.k == _p) {
                   if (v == _d) { U(b, _h, _d, ""); P(W[i], b); return I(i + 1, mkB(i == ln(B) - 1), 1); }
-                  if ((e = /^(?:(#{1,3}|[-*]|\d{1,3}\.|>) |```(?:$|([\w-]{0,24})[ \n]))([\s\S]*)$/.exec(v))) {
+                  if (e = /^(?:(#{1,3}|[-*]|\d{1,3}\.|>) |```(?:$|([\w-]{0,24})[ \n]))([\s\S]*)$/.exec(v)) {
                     let [x, y] = gS(t, b), d0;
                     j = e[1];
                     U(b, !j ? _c : j[0] == "#" ? "h" + ln(j) : j == ">" ? _q : ln(j) > 1 ? _o : _u, j ? j + " " : e[2] || "", e[3]);
@@ -731,7 +768,7 @@
                 }
                 liveComp(t, X);
                 v = serDom(t);
-                b.v = v; b.r = N; v && (b.q = 0);
+                b.v = v; b.r = N; v ? mat(i, w0) : syncG(i);
                 H0(); sv(i); E();
               };
             t = h(tg0, r ? { className: _nb + "-ed" } : {
@@ -750,9 +787,9 @@
                   if (isL(m) && !v) return R0(i, i == n);
                   let a = sl(v, 0, x), d = sl(v, s), l = isL(m) ? m : _p,
                     o = m == _u ? b.m : m == _o ? b.m.replace(/\d+/, (q) => Math.min(999, +q + 1)) : "";
-                  b.v = a; b.r = N; (a || d) && (b.q = 0);
+                  b.v = a; b.r = N; (a || d) && mat0(i);
                   fillEd(t, a, X);
-                  return I(i + 1, mkB(l == _p && !d && i == n, l, o, d, l == _p ? _n + _n : _n), 1);
+                  return I(i + 1, mkB(l == _p && !d && i == n, l, o, d, l == _p ? (a || m != _p ? _n + _n : _n) : _n), 1);
                 }
                 if (y == "Backspace") {
                   let [q, r] = getR(), c = r?.startContainer;
@@ -769,7 +806,7 @@
                     if (i) {
                       pd(e); let v = B[i - 1];
                       if (v.k == _h) return D(i - 1), i == 1 && (b.g = ""), b.q && ln(B) == 1 && U(b, _p, ""), H0(), Y(i - 1, 0, 0, 1);
-                      let o = ln(v.v); U(v, v.k, v.m, v.v + b.v); D(i); P(W[i - 1], v); H0(); return Y(i - 1, o, o, 1);
+                      let o = ln(v.v); U(v, v.k, v.m, v.v + b.v); D(i); P(W[i - 1], v); eh(W[i - 1], v); H0(); return Y(i - 1, o, o, 1);
                     }
                   }
                 }
@@ -779,10 +816,10 @@
                 let x = e?.clipboardData?.getData?.("text/plain");
                 if (!isS(x)) return;
                 x = x.replace(/\r\n/g, _n);
-                let [a, d] = gS(t, b), v = b.v;
+                let [a, d] = gS(t, b), v = b.v, w0 = b.k != _p || v;
                 if (!x.includes(_n)) {
                   let s = sl(v, 0, a) + x + sl(v, d), o = a + ln(x);
-                  b.v = s; b.r = N; s && (b.q = 0);
+                  b.v = s; b.r = N; s ? mat(i, w0) : syncG(i);
                   fillEd(t, s, X);
                   b.v = serDom(t); H0();
                   o = Math.min(o, ln(b.v));
@@ -790,9 +827,11 @@
                 }
                 let m = parseN(serN({ k: b.k, m: b.m, v: sl(v, 0, a) }) + x + sl(v, d))[0].filter((n) => !n.q);
                 if (!ln(m)) return;
+                mat0(i);
                 m[0].g = b.g; m.map((n) => (n.r = N));
-                B.splice(i, 1, ...m); A = -1; V = N; Z();
+                B.splice(i, 1, ...m); A = -1; V = N;
                 let o = i + ln(m) - 1;
+                syncG(o, 1); Z();
                 o == ln(B) - 1 && B[o].k == _h && (I(ln(B), mkB(1)), o++);
                 Y(o, N, N, 1);
               })
@@ -814,10 +853,10 @@
               [x, y] = A >= 0 && t && inS(t) ? gS(t, b) : Q,
               s = k == "list" ? _u : k == "quote" ? _q : k, m = BK[s], j, e;
             x = K(x ?? n, n); y = K(y ?? n, n, x);
-            if (k == _h) return b.k == _p && !b.v ? (U(b, _h, _d, ""), P(W[i], b), H0()) : I(++i, mkB(0, _h, _d)), I(i + 1, mkB(1), 1);
+            if (k == _h) return b.k == _p && !b.v ? (U(b, _h, _d, ""), P(W[i], b), H0()) : I(++i, mkB(0, _h, _d)), I(i + 1, mkB(i == ln(B) - 1), 1);
             if (m || k == "codeblock" || k == _c && sl(v, x, y).includes(_n))
               return j = m ? s : _c, e = b.k == j && k != _c, U(b, e ? _p : j, e ? "" : m || ""), P(W[i], b), H0(), Y(i, x, y, 1);
-            if ((j = fmtMd(v, x, y, k))) {
+            if (j = fmtMd(v, x, y, k)) {
               let o = b.k == _h, a = sl(v, 0, x), d = sl(v, y);
               U(b, o ? _p : b.k, o ? "" : b.m, a + j[0] + d);
               if (o) t = P(W[i], b);
@@ -827,6 +866,42 @@
               H0(); Y(i, j[1], j[2], 1);
             }
           },
+          atY = (cy) => {
+            if (q) { T()?.focus?.(); return; }
+            if (r || !ln(B)) return;
+            let z = B[ln(B) - 1], wl = W[ln(W) - 1], br = (x) => isF(x?.getBoundingClientRect) ? x.getBoundingClientRect() : N, rl = br(wl);
+            if (!isN(cy) || !rl) {
+              z && (z.k != _p || z.v) ? I(ln(B), mkB(1), 1) : Y(ln(B) - 1);
+              return;
+            }
+            let r0 = br(W[0]) || rl, cs = isF(R?.getComputedStyle) ? R.getComputedStyle : N,
+              pf = (x) => parseFloat(x) || 0, mb = cs ? pf(cs(wl)?.marginBottom) : 0,
+              es = cs && wl._ed ? cs(wl._ed) : N,
+              est = es ? Math.max(pf(es.lineHeight) + pf(es.paddingTop) + pf(es.paddingBottom), pf(es.minHeight)) : 0,
+              bh = Math.max(24, rl.height > 0 && rl.height <= 48 ? rl.height : est || 28),
+              st = bh + mb,
+              add = (n0) => {
+                for (let i = 0; i < n0; i++) {
+                  let pv = B[ln(B) - 1];
+                  I(ln(B), mkB(1, _p, "", "", pv && (pv.k != _p || pv.v) ? _n + _n : _n), i == n0 - 1);
+                }
+              };
+            if (ln(B) == 1 && B[0].k == _p && !B[0].v) {
+              let t = K(Math.floor((cy - r0.top) / st), maxR, 0);
+              t ? add(t) : Y(0);
+              return;
+            }
+            if (cy <= rl.bottom) {
+              let k = ln(W) - 1;
+              for (let i = 0; i < ln(W); i++) { let ri = br(W[i]); if (ri && cy <= ri.bottom + mb / 2) { k = i; break; } }
+              Y(k);
+              return;
+            }
+            let nt0 = rl.bottom + mb,
+              ex = cy >= nt0 ? 1 + Math.floor((cy - nt0) / st) : (z && (z.k != _p || z.v) ? 1 : 0),
+              an = K(ln(B) - 1 + ex, maxR, 0) - (ln(B) - 1);
+            an > 0 ? add(an) : Y(ln(B) - 1);
+          },
           d = (s, x) => {
             let t = s == N ? "" : S(s), [b, y] = parseN(t);
             B = b; g = y; A = -1; V = N; L = 0; Q = [0, 0];
@@ -834,25 +909,12 @@
             x && E();
           };
         cl(c, "bui-notion", 1);
+        c.style && !c.style.cursor && (c.style.cursor = "text");
         M("notion");
         a && (vis(a, false), C(a));
         on(c, "click", (e) => {
           if (r || q || e?.target != c) return;
-          let z = B[ln(B) - 1], w = W[ln(W) - 1], n = 0;
-          if (e.clientY && isF(w?.getBoundingClientRect)) {
-            let b = w.getBoundingClientRect(),
-              h = Math.max(24, b.height > 0 && b.height <= 48 ? b.height : 28),
-              d = e.clientY - b.bottom;
-            if (d > h) {
-              n = Math.round(d / (h + 3));
-              n = n > 18 ? 18 : n;
-            }
-          }
-          if (n > 0) {
-            for (let i = 0; i < n; i++) I(ln(B), mkB(1), i == n - 1);
-          } else {
-            z && (z.k != _p || z.v) ? I(ln(B), mkB(1), 1) : Y(ln(B) - 1);
-          }
+          atY(e.clientY);
         });
         d(o.value != N ? o.value : a ? a.value : "");
         return {
@@ -866,6 +928,8 @@
             B[i]?.k == _h && i + 1 < ln(B) && i++;
             Y(i);
           },
+          focusAtPoint: (cx, cy) => atY(cy),
+          getActiveRow: () => A >= 0 ? A : K(L),
           clear: (x) => d("", x),
           onChange: (x) => !isF(x) ? () => {} : (f.push(x), () => { let j = ix(f, x); j >= 0 && f.splice(j, 1); }),
           applyFormat: F,

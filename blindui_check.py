@@ -1167,7 +1167,7 @@ def _check_bui_05(
     """BUI-05: Elysia-style JS-to-Server Route Parity."""
     js_routes = extract_js_routes(tokenized_scripts)
     for method, path, lbl in js_routes:
-        if surface in ("sign", "social", "finance", "developers") and path.startswith("/mail/api/v1/auth/"):
+        if surface in ("sign", "social", "finance", "developers", "live", "call") and path.startswith("/mail/api/v1/auth/"):
             if sso_routes is not None:
                 stripped = path[len("/mail"):]
                 if sso_routes.matches(method, path) or sso_routes.matches(method, stripped):
@@ -1452,7 +1452,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="BlindUI Elysia-style static validator (BUI-01..BUI-10)")
     parser.add_argument("--ui", required=True, help="Path to UI .py or .html file")
     parser.add_argument("--server", required=True, help="Path to server .py file")
-    parser.add_argument("--surface", required=True, choices=["mail", "sign", "social", "finance", "developers"], help="Target app surface")
+    parser.add_argument("--surface", required=True, choices=["mail", "sign", "social", "finance", "developers", "live", "call"], help="Target app surface")
     parser.add_argument("--html-var", default=None, help="Python variable holding HTML (default: INDEX_HTML then APP_HTML)")
     parser.add_argument("--blindui", default=None, help="Path to blindui.min.js bundle to validate")
     parser.add_argument("--sso-server", default=None, help="Optional BlindMail server.py for cross-surface SSO route parity")

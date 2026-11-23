@@ -424,8 +424,8 @@ class TestBlindUiCheckCounterfactuals(unittest.TestCase):
     def test_real_apps_zero_false_positives_when_present(self) -> None:
         apps_root_env = os.environ.get("BLINDUI_APPS_DIR", "").strip()
         if not apps_root_env:
-            # Verify zero false positives on clean synthetic fixtures for all five surfaces.
-            for surface in ("social", "finance", "mail", "sign", "developers"):
+            # Verify zero false positives on clean synthetic fixtures for all surfaces.
+            for surface in ("social", "finance", "mail", "sign", "developers", "live", "call"):
                 ui_p, srv_p = self._write_pair(
                     _make_clean_ui_py(),
                     _make_clean_server_py(),

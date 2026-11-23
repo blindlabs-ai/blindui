@@ -1451,27 +1451,72 @@ async function runSuiteForBuild(label, filePath) {
     const yHost = doc.register(BlindUI.h("div", { id: "ne-host-click-y" }));
     const yEd = BlindUI.notionEditor(yHost, { value: "Top block" });
     yHost.childNodes[0].getBoundingClientRect = () => ({ top: 100, bottom: 128, height: 28 });
-    // dy = 283 - 128 = 155, lineH = 28, Math.round(155 / 31) = 5 new blocks -> 6 total
-    yHost.dispatchEvent({ type: "click", target: yHost, clientY: 283 });
+    // dy = 250 - 128 = 122, stride = 28, ex = 1 + floor(122 / 28) = 5 new blocks -> 6 total (row 5)
+    yHost.dispatchEvent({ type: "click", target: yHost, clientY: 250 });
     assert.equal(yHost.childNodes.length, 6);
+    assert.equal(yEd.getActiveRow(), 5);
     const botEd = findBlockEd(yHost, 5);
     assert.equal(doc.activeElement, botEd);
     assert.equal(yEd.getMarkdown(), "Top block");
     // Clicking even further down from a focused phantom block preserves prior spacers and appends more
-    yHost.childNodes[5].getBoundingClientRect = () => ({ top: 255, bottom: 283, height: 28 });
-    yHost.dispatchEvent({ type: "click", target: yHost, clientY: 345 });
+    yHost.childNodes[5].getBoundingClientRect = () => ({ top: 240, bottom: 268, height: 28 });
+    // dy = 310 - 268 = 42, stride = 28, ex = 1 + floor(42 / 28) = 2 new blocks -> 8 total (row 7)
+    yHost.dispatchEvent({ type: "click", target: yHost, clientY: 310 });
     assert.equal(yHost.childNodes.length, 8);
+    assert.equal(yEd.getActiveRow(), 7);
     const botEd2 = findBlockEd(yHost, 7);
     assert.equal(doc.activeElement, botEd2);
     typeChars(botEd2, "Bottom line");
-    assert.equal(yEd.getMarkdown(), "Top block\n\nBottom line");
-    // Extreme clientY caps appended blocks at 18
+    assert.equal(yEd.getMarkdown(), "Top block\n\n\n\n\n\n\n\nBottom line");
+    // Reload roundtrip preserves exact vertical spacing and row index
+    yEd.setMarkdown(yEd.getMarkdown());
+    assert.equal(yHost.childNodes.length, 8);
+    assert.equal(findBlockEd(yHost, 7).textContent, "Bottom line");
+    assert.equal(yEd.getMarkdown(), "Top block\n\n\n\n\n\n\n\nBottom line");
+
+    // Empty-doc row 1 click has zero dead zone, and +150px focusAtPoint lands on row >= 4 (!= 0)
+    const emptyHost = doc.register(BlindUI.h("div", { id: "ne-host-click-empty" }));
+    const emptyEd = BlindUI.notionEditor(emptyHost, { value: "" });
+    emptyHost.childNodes[0].getBoundingClientRect = () => ({ top: 16, bottom: 44, height: 28 });
+    emptyHost.dispatchEvent({ type: "click", target: emptyHost, clientY: 48 });
+    assert.equal(emptyHost.childNodes.length, 2);
+    assert.equal(emptyEd.getActiveRow(), 1);
+    emptyEd.setMarkdown("");
+    emptyHost.childNodes[0].getBoundingClientRect = () => ({ top: 16, bottom: 44, height: 28 });
+    emptyEd.focusAtPoint(60, 150);
+    assert.notEqual(emptyEd.getActiveRow(), 0, "Counterfactual knockout: must not stay stuck at row 0");
+    assert.ok(emptyEd.getActiveRow() >= 4, `Expected row >= 4, got ${emptyEd.getActiveRow()}`);
+    const lowerRow = emptyEd.getActiveRow();
+    typeChars(findBlockEd(emptyHost, lowerRow), "Hello from lower body");
+    assert.equal(emptyEd.getMarkdown(), "\n".repeat(lowerRow) + "Hello from lower body");
+    emptyEd.setMarkdown(emptyEd.getMarkdown());
+    assert.equal(emptyHost.childNodes.length, lowerRow + 1);
+    assert.equal(findBlockEd(emptyHost, lowerRow).textContent, "Hello from lower body");
+
+    // 4px margin gap click between row 1 and row 2 focuses row 1 (never falls through to bottom)
+    const gapHost = doc.register(BlindUI.h("div", { id: "ne-host-click-gap" }));
+    const prevGcs = env.getComputedStyle;
+    env.getComputedStyle = () => ({ marginBottom: "4px", lineHeight: "24px", paddingTop: "2px", paddingBottom: "2px", minHeight: "28px" });
+    try {
+      const gapEd = BlindUI.notionEditor(gapHost, { value: "Row 0\n\nRow 1\n\nRow 2" });
+      gapHost.childNodes[0].getBoundingClientRect = () => ({ top: 16, bottom: 44, height: 28 });
+      gapHost.childNodes[1].getBoundingClientRect = () => ({ top: 48, bottom: 76, height: 28 });
+      gapHost.childNodes[2].getBoundingClientRect = () => ({ top: 80, bottom: 108, height: 28 });
+      gapHost.dispatchEvent({ type: "click", target: gapHost, clientY: 77 });
+      assert.equal(gapHost.childNodes.length, 3);
+      assert.equal(gapEd.getActiveRow(), 1);
+      assert.equal(doc.activeElement, findBlockEd(gapHost, 1));
+    } finally {
+      env.getComputedStyle = prevGcs;
+    }
+
+    // Extreme clientY caps appended blocks at default maxRows=40 (41 total blocks)
     const capHost = doc.register(BlindUI.h("div", { id: "ne-host-click-cap" }));
     BlindUI.notionEditor(capHost, { value: "" });
     capHost.childNodes[0].getBoundingClientRect = () => ({ top: 50, bottom: 78, height: 28 });
-    capHost.dispatchEvent({ type: "click", target: capHost, clientY: 1500 });
-    assert.equal(capHost.childNodes.length, 19);
-    assert.equal(doc.activeElement, findBlockEd(capHost, 18));
+    capHost.dispatchEvent({ type: "click", target: capHost, clientY: 5000 });
+    assert.equal(capHost.childNodes.length, 41);
+    assert.equal(doc.activeElement, findBlockEd(capHost, 40));
 
     // Single-line paste XSS falsifier: <img onerror> and [bad](javascript:alert(1))
     const pasteHost = doc.register(BlindUI.h("div", { id: "ne-host-paste" }));
@@ -1588,6 +1633,120 @@ async function runSuiteForBuild(label, filePath) {
     assert.equal(host.childNodes.length, 1);
     assert.equal(host.childNodes[0].getAttribute("data-block-type"), "p");
     assert.equal(ed.getMarkdown(), "");
+
+    // Canonical Separator Law falsifiers (F1-F5/F9 + tight heading + Enter-at-0)
+    // F1: Backspace on empty mid-doc spacer preserves paragraph break (never collapses to single \n)
+    ed.setMarkdown("Top\n\n\nBottom");
+    assert.equal(host.childNodes.length, 3);
+    el = findBlockEd(host, 1);
+    el.focus();
+    setSel(el, 0);
+    el.dispatchEvent({ type: "keydown", key: "Backspace" });
+    assert.equal(host.childNodes.length, 2);
+    assert.equal(ed.getMarkdown(), "Top\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 2);
+
+    // F2: Clearing row 0 above another paragraph emits exactly 1 leading newline (no +1 spacer leak)
+    ed.setMarkdown("Hello\n\nWorld");
+    el = findBlockEd(host, 0);
+    el.focus();
+    setEdText(el, "", 0);
+    assert.equal(ed.getMarkdown(), "\nWorld");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 2);
+
+    // F3: Clearing a middle paragraph emits exactly 3 newlines (1 spacer, not 2)
+    ed.setMarkdown("Top\n\nMid\n\nBottom");
+    el = findBlockEd(host, 1);
+    el.focus();
+    setEdText(el, "", 0);
+    assert.equal(ed.getMarkdown(), "Top\n\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 3);
+
+    // F4: Type-then-delete on a spacer roundtrips back to exact original newline count
+    ed.setMarkdown("\n\n\n\nHello");
+    assert.equal(host.childNodes.length, 5);
+    el = findBlockEd(host, 2);
+    el.focus();
+    setEdText(el, "x", 1);
+    assert.equal(ed.getMarkdown(), "\n\nx\n\n\nHello");
+    setEdText(el, "", 0);
+    assert.equal(ed.getMarkdown(), "\n\n\n\nHello");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 5);
+
+    // F5/F9: Enter after mid-doc spacer edit or after paragraph 1 never double-jumps rows
+    ed.setMarkdown("\n\n\n\nHello");
+    el = findBlockEd(host, 1);
+    el.focus();
+    setEdText(el, "Mid", 3);
+    el.dispatchEvent({ type: "keydown", key: "Enter" });
+    assert.equal(host.childNodes.length, 6);
+    assert.equal(ed.getMarkdown(), "\nMid\n\n\n\n\nHello");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 6);
+
+    ed.setMarkdown("Top\n\n\n\nBottom");
+    el = findBlockEd(host, 1);
+    el.focus();
+    setEdText(el, "Mid", 3);
+    el.dispatchEvent({ type: "keydown", key: "Enter" });
+    assert.equal(host.childNodes.length, 5);
+    assert.equal(ed.getMarkdown(), "Top\n\nMid\n\n\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 5);
+
+    ed.setMarkdown("Top\n\nBottom");
+    el = findBlockEd(host, 0);
+    el.focus();
+    setSel(el.firstChild, 3);
+    el.dispatchEvent({ type: "keydown", key: "Enter" });
+    assert.equal(host.childNodes.length, 3);
+    assert.equal(ed.getMarkdown(), "Top\n\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 3);
+
+    // Enter at offset 0 above loose list preserves list separator; tight heading edit preserves single \n
+    ed.setMarkdown("Top\n\n- item");
+    el = findBlockEd(host, 0);
+    el.focus();
+    setSel(el.firstChild, 0);
+    el.dispatchEvent({ type: "keydown", key: "Enter" });
+    assert.equal(ed.getMarkdown(), "\nTop\n\n- item");
+
+    ed.setMarkdown("# Title\nSubtitle");
+    el = findBlockEd(host, 0);
+    el.focus();
+    setEdText(el, "Title 2", 7);
+    assert.equal(ed.getMarkdown(), "# Title 2\nSubtitle");
+
+    // Mid-document applyFormat("hr") never inserts a phantom q=1 block ahead of live blocks
+    ed.setMarkdown("Top\n\n\n\nBottom");
+    el = findBlockEd(host, 1);
+    el.focus();
+    ed.applyFormat("hr");
+    assert.equal(host.childNodes.length, 5);
+    assert.equal(ed.getMarkdown(), "Top\n\n---\n\n\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 5);
+
+    ed.setMarkdown("Top\n\nBottom");
+    el = findBlockEd(host, 0);
+    el.focus();
+    ed.applyFormat("hr");
+    assert.equal(host.childNodes.length, 4);
+    assert.equal(ed.getMarkdown(), "Top\n\n---\n\n\nBottom");
+    ed.setMarkdown(ed.getMarkdown());
+    assert.equal(host.childNodes.length, 4);
+
+    ed.setMarkdown("Above");
+    el = findBlockEd(host, 0);
+    el.focus();
+    ed.applyFormat("hr");
+    assert.equal(ed.getMarkdown(), "Above\n\n---");
+    assert.deepEqual(Array.from(ed.getBlocks(), (b) => b.type), ["p", "hr"]);
 
     // ArrowDown / ArrowUp navigation and Escape blurs active block
     ed.setMarkdown("Top\n\nBottom");
@@ -1790,6 +1949,9 @@ async function runSuiteForBuild(label, filePath) {
       "---",
       "#### h4",
       "  - x",
+      "\n\n\n\nHello from lower body",
+      "Top\n\n\n\n\n\nBottom",
+      "\n".repeat(60) + "Deep",
       "# Title\n\nParagraph with **bold** and [ok](https://example.com/p)\n\n- a\n- b\n\n1. one\n2. two\n\n> quoted\n> line 2\n\n```py\nprint(1)\n```\n\n---\n",
     ];
     for (const sample of roundtripCases) {
