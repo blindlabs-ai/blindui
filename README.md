@@ -1,14 +1,14 @@
 # Zero-UI
 
-Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,138` bytes minified) standardized component kit, `4 KB` (`4,087` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
+Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,164` bytes minified) standardized component kit, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
 
 | Property | Specification |
 | :--- | :--- |
 | **Website** | https://blindlabs.ai |
 | **Repository** | https://github.com/blindlabs-ai/zero-ui |
 | **Core Bundle** | `27,735` bytes (`blindui.min.js`, verified `< 28 KB` hard budget) |
-| **Component Kit** | `8,138` bytes (`blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
-| **Design Tokens** | `4,087` bytes (`blindui-tokens.css`, verified `<= 4 KB` hard budget) |
+| **Component Kit** | `8,164` bytes (`blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
+| **Design Tokens** | `4,094` bytes (`blindui-tokens.css`, verified `<= 4 KB` hard budget) |
 | **Runtime Dependencies** | `0` `npm` packages, `0` `pip` packages (pure ES2020 + Python 3 stdlib) |
 | **Security Posture** | Strict tag/attribute/URL allowlists, `O(n)` Safe-Markdown, `BUI-01..BUI-10` static AST/HTML gate |
 | **License** | Apache License, Version 2.0 ([LICENSE](LICENSE) & [NOTICE](NOTICE)) |
@@ -20,7 +20,7 @@ Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DO
 - **Safe-DOM Construction by Default (`BlindUI.h`, `BlindUI.svg`, `BlindUI.sanitizeUrl`):** Strictly allowlists HTML and SVG tags/attributes, enforces `blob:` origin isolation on `<iframe>` previews, validates `https:` and header-safe `mailto:` URLs, and eliminates raw HTML parsing or dynamic script-execution sinks across the entire runtime.
 - **Linear-Time Safe-Markdown & Rich Editors (`BlindUI.md`, `BlindUI.bindMdEditor`, `BlindUI.notionEditor`):** Single-pass `O(n)` Markdown rendering and block/raw editing with click-anywhere vertical placement (`focusAtPoint`, `getActiveRow`), tested against 30+ XSS payload classes and pathological nested inputs without catastrophic regex backtracking (ReDoS).
 - **Zero-Framework UI Primitives (`BlindUI.modal`, `BlindUI.bindAction`, `BlindUI.bindGroup`, `BlindUI.defineRoutes`, `BlindUI.api`):** Responsive docked/sheet modal controller with focus restoration, delegated selector/action wiring, optional request signing (`setSigner`), and client-side request/response schema validation.
-- **Standardized Component Kit & Obsidian Tokens (`BlindUI.kit.*` + `blindui-tokens.css`):** Companion `8,138`-byte library built strictly on `BlindUI.h` and `BlindUI.svg` providing ready-to-mount application shells, KPI strips, step rails, one-time secret API key cards, tabbed code blocks, status pills, and live API runner panels styled by a `4,087`-byte obsidian CSS token sheet.
+- **Standardized Component Kit & Obsidian Tokens (`BlindUI.kit.*` + `blindui-tokens.css`):** Companion `8,164`-byte library built strictly on `BlindUI.h` and `BlindUI.svg` providing 14-surface geometric SVG icons, ready-to-mount application shells, KPI strips, step rails, one-time secret API key cards, tabbed code blocks, status pills, and live API runner panels styled by a `4,094`-byte obsidian CSS token sheet with per-surface colors and reduced-motion micro-animations.
 - **Static Full-Stack Contract & Hygiene Gate (`blindui_check.py` + `build_blindui.py`):** Audits web frontends and Python backends via `ast.parse()` and `HTMLParser` (never executing target code) for unsafe DOM sinks, unescaped templating, unbound UI actions, route drift, CSP headers, and byte-exact `blindui.min.js` / `blindui-kit.min.js` reproducibility.
 
 ---
@@ -42,8 +42,8 @@ Load `blindui.min.js` (and optionally `blindui-tokens.css` + `blindui-kit.min.js
     { className: "bui-col" },
     kit.kpiStrip([
       { label: "Core Bundle", value: "27,735 B", tone: "ok", sub: "< 28 KB budget" },
-      { label: "Kit Bundle", value: "8,138 B", tone: "ok", sub: "<= 8 KB budget" },
-      { label: "CSS Tokens", value: "4,087 B", tone: "ok", sub: "<= 4 KB budget" }
+      { label: "Kit Bundle", value: "8,164 B", tone: "ok", sub: "<= 8 KB budget" },
+      { label: "CSS Tokens", value: "4,094 B", tone: "ok", sub: "<= 4 KB budget" }
     ]),
     h(
       "section",
@@ -82,11 +82,12 @@ Load `blindui.min.js` (and optionally `blindui-tokens.css` + `blindui-kit.min.js
 
 ### Standardized Component Kit (`window.BlindUI.kit`)
 
-Load `blindui-kit.min.js` (`8,138` bytes) alongside `blindui-tokens.css` (`4,087` bytes) after `blindui.min.js` to attach seven reusable Safe-DOM primitives to `window.BlindUI.kit`:
+Load `blindui-kit.min.js` (`8,164` bytes) alongside `blindui-tokens.css` (`4,094` bytes) after `blindui.min.js` to attach eight reusable Safe-DOM primitives to `window.BlindUI.kit`:
 
 | Export | Purpose |
 | :--- | :--- |
-| `kit.shell(opts)` | Sticky suite header, sanitized brand/nav links with active surface state, main container, and optional footer |
+| `kit.icon(id, size?)` | Crisp 24x24 geometric SVG icon across 14 canonical surfaces (`blog`, `benchmarks`, `apps`, `developers`, `chain`, `mail`, `sign`, `social`, `finance`, `live`, `call`, `cdn`, `github`, `home`) with safe `apps` fallback and `data-surface` color/motion hook |
+| `kit.shell(opts)` | Sticky suite header, sanitized brand/nav links with active surface state and per-surface icons, main container, and optional footer |
 | `kit.kpiStrip(opts \| items)` | Responsive metric card grid with tabular numerals, semantic tones (`ok`, `warn`, `err`), and safe empty fallbacks |
 | `kit.stepRail(opts \| steps)` | Multi-step workflow rail (`todo`, `active`, `done`) with SVG checkmarks and collapsed completed bodies |
 | `kit.keyCard(opts)` | API key lifecycle card with prefix display, quota progress bar, one-time dismissible `secretOnce` reveal/copy, and single-flight `aria-busy` rotate/revoke locks |
@@ -101,13 +102,13 @@ Load `blindui-kit.min.js` (`8,138` bytes) alongside `blindui-tokens.css` (`4,087
 ```text
 blindui.js               # Readable ES2020 Safe-DOM, Safe-Markdown, editor, modal, and API runtime
 blindui.min.js           # Deterministic minified core production bundle (27,735 bytes, < 28 KB)
-blindui-kit.js           # Readable ES2020 standardized 7-primitive component kit (BlindUI.kit)
-blindui-kit.min.js       # Deterministic minified component kit bundle (8,138 bytes, <= 8 KB)
-blindui-tokens.css       # Obsidian design token & component utility stylesheet (4,087 bytes, <= 4 KB)
+blindui-kit.js           # Readable ES2020 standardized 8-primitive component kit (BlindUI.kit)
+blindui-kit.min.js       # Deterministic minified component kit bundle (8,164 bytes, <= 8 KB)
+blindui-tokens.css       # Obsidian design token & component utility stylesheet (4,094 bytes, <= 4 KB)
 build_blindui.py         # Zero-dependency deterministic ES2020 minifier & bundle/token verifier (--check)
 blindui_check.py         # Static UI-to-server contract & XSS hygiene validator (rules BUI-01..BUI-10)
 test_blindui.mjs         # Zero-dep Node.js core test suite (32 tests across source + minified bundles)
-test_blindui_kit.mjs     # Zero-dep Node.js kit test suite (17 tests across source + minified bundles + budgets)
+test_blindui_kit.mjs     # Zero-dep Node.js kit test suite (19 tests across source + minified bundles + budgets)
 test_blindui_check.py    # Python unittest suite for blindui_check.py (15 static analysis tests)
 test_blindui_browser.py  # Headless Chrome desktop + mobile touch click-anywhere parity test (optional Playwright)
 LICENSE                  # Apache License, Version 2.0
@@ -125,7 +126,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 build_blindui.py --check --require-node
 # 2. Run core Safe-DOM, Safe-Markdown, URL sanitizer, editor, modal, and XSS suite (32/32 tests)
 node test_blindui.mjs
 
-# 3. Run component kit, XSS escaping, single-flight lock, and budget suite (17/17 tests)
+# 3. Run component kit, icon, XSS escaping, single-flight lock, and budget suite (19/19 tests)
 node --test test_blindui_kit.mjs
 
 # 4. Run static security & route-parity analyzer suite (15/15 tests)

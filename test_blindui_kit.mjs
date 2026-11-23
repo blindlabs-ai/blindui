@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Zero-dependency Node v22 test suite for BlindUI Kit (blindui-kit.js & blindui-kit.min.js).
- * Tests all 7 primitives (shell, kpiStrip, stepRail, keyCard, codeBlock, statusPill, tryItPanel),
- * XSS escaping, single-flight aria-busy locks, secretOnce clearing, and bundle budgets.
+ * Tests all 8 primitives (icon, shell, kpiStrip, stepRail, keyCard, codeBlock, statusPill, tryItPanel),
+ * XSS escaping, single-flight aria-busy locks, secretOnce clearing, CSS motion/layout, and bundle budgets.
  */
 
 import assert from "node:assert/strict";
@@ -273,11 +273,59 @@ for (const [label, kitPath] of [
   ["blindui-kit.min.js", KIT_MIN_PATH],
 ]) {
   describe(`BlindUI.kit (${label})`, () => {
-    test("attaches version 1.0.0 and all 7 primitives onto BlindUI.kit", () => {
+    test("attaches version 1.0.0 and all 8 primitives onto BlindUI.kit", () => {
       const { kit } = loadKitEnv(kitPath);
       assert.equal(kit.version, "1.0.0");
-      for (const fn of ["shell", "kpiStrip", "stepRail", "keyCard", "codeBlock", "statusPill", "tryItPanel"]) {
+      for (const fn of ["icon", "shell", "kpiStrip", "stepRail", "keyCard", "codeBlock", "statusPill", "tryItPanel"]) {
         assert.equal(typeof kit[fn], "function", `missing BlindUI.kit.${fn}`);
+      }
+    });
+
+    test("icon renders 14 distinct surface SVGs with non-empty path d, safe fallbacks, and size validation", () => {
+      const { kit } = loadKitEnv(kitPath);
+      const surfaces = [
+        "blog", "benchmarks", "apps", "developers", "chain", "mail", "sign",
+        "social", "finance", "live", "call", "cdn", "github", "home",
+      ];
+      const pathBySurface = new Map();
+      for (const id of surfaces) {
+        const el = kit.icon(id);
+        assert.equal(el.tagName, "svg");
+        assert.equal(el.getAttribute("class"), "bk-ic");
+        assert.equal(el.getAttribute("data-surface"), id);
+        assert.equal(el.getAttribute("width"), "14");
+        assert.equal(el.getAttribute("height"), "14");
+        const paths = findAll(el, (n) => n.nodeType === 1 && n.tagName === "path");
+        assert.equal(paths.length, 1, `expected 1 <path> for ${id}`);
+        const d = paths[0].getAttribute("d");
+        assert.ok(typeof d === "string" && d.length >= 10, `empty or mangled <path d> for ${id}: ${d}`);
+        pathBySurface.set(id, d);
+      }
+      assert.equal(new Set(pathBySurface.values()).size, 14, "all 14 surface icons must have distinct <path d>");
+
+      // Case-insensitive lookup works cleanly.
+      const upper = kit.icon("BLOG");
+      assert.equal(upper.getAttribute("data-surface"), "blog");
+      assert.equal(findAll(upper, (n) => n.nodeType === 1 && n.tagName === "path")[0].getAttribute("d"), pathBySurface.get("blog"));
+
+      // Unknown / prototype-pollution IDs fall back to apps path with no data-surface attribute.
+      for (const badId of ["unknown", "toString", "__proto__", null, undefined]) {
+        const fb = kit.icon(badId);
+        assert.equal(fb.tagName, "svg");
+        assert.equal(fb.getAttribute("class"), "bk-ic");
+        assert.equal(fb.getAttribute("data-surface"), null);
+        const d = findAll(fb, (n) => n.nodeType === 1 && n.tagName === "path")[0].getAttribute("d");
+        assert.equal(d, pathBySurface.get("apps"));
+      }
+
+      // Valid numeric size applies; invalid sizes fall back to 14.
+      const big = kit.icon("blog", 18);
+      assert.equal(big.getAttribute("width"), "18");
+      assert.equal(big.getAttribute("height"), "18");
+      for (const badSize of [0, -5, NaN, Infinity, "xss"]) {
+        const def = kit.icon("blog", badSize);
+        assert.equal(def.getAttribute("width"), "14");
+        assert.equal(def.getAttribute("height"), "14");
       }
     });
 
@@ -303,7 +351,7 @@ for (const [label, kitPath] of [
     });
 
     test("shell builds 5-surface suite nav, active state, URL sanitization, and XSS safety", () => {
-      const { document, kit } = loadKitEnv(kitPath);
+      const { document, BlindUI, kit } = loadKitEnv(kitPath);
       const sso = document.createElement("div");
       sso.id = "sso-slot";
       const mainNode = document.createElement("p");
@@ -331,9 +379,20 @@ for (const [label, kitPath] of [
       assert.ok(brandEl.textContent.includes(XSS_TAG));
       assert.equal(findAll(el, (n) => n.nodeType === 1 && n.tagName === "script").length, 0);
 
-      // Default 5 nav items with developers active.
+      // Default 5 nav items with developers active and surface SVG icons.
       const navLinks = findAll(el, (n) => n.nodeType === 1 && n.classList.contains("bui-tab"));
       assert.equal(navLinks.length, 5);
+      for (const link of navLinks) {
+        const surf = link.getAttribute("data-surface");
+        const svgs = findAll(link, (n) => n.nodeType === 1 && n.tagName === "svg");
+        assert.equal(svgs.length, 1);
+        assert.equal(svgs[0].getAttribute("class"), "bk-ic");
+        assert.equal(svgs[0].getAttribute("data-surface"), surf);
+        const p = findAll(svgs[0], (n) => n.nodeType === 1 && n.tagName === "path")[0];
+        assert.ok(p && p.getAttribute("d") && p.getAttribute("d").length >= 10);
+      }
+      const brandPath = findAll(brandEl, (n) => n.nodeType === 1 && n.tagName === "path")[0];
+      assert.ok(brandPath && brandPath.getAttribute("d") && brandPath.getAttribute("d").length >= 10);
       const devLink = navLinks.find((n) => n.getAttribute("data-surface") === "developers");
       assert.ok(devLink);
       assert.equal(devLink.tagName, "a");
@@ -341,12 +400,15 @@ for (const [label, kitPath] of [
       assert.equal(devLink.getAttribute("aria-current"), "page");
       assert.ok(devLink.classList.contains("bui-on"));
 
-      // Custom navItems with dangerous href degrades to <span>.
+      // Custom navItems: dangerous href degrades to <span>, plus icon:false, icon:"mail", and custom SVG passthrough.
+      const customSvg = BlindUI.svg("svg", { id: "custom-svg", width: 14, height: 14, viewBox: "0 0 24 24" });
+      const mailPath = findAll(kit.icon("mail"), (n) => n.nodeType === 1 && n.tagName === "path")[0].getAttribute("d");
       const custom = kit.shell({
         brandHref: "/developers/",
         navItems: [
-          { id: "bad", label: "Evil", href: XSS_JS_URL },
-          { id: "good", label: "Docs", href: "https://blindlabs.example/docs", active: true },
+          { id: "bad", label: "Evil", href: XSS_JS_URL, icon: false },
+          { id: "good", label: "Docs", href: "https://blindlabs.example/docs", active: true, icon: "mail" },
+          { id: "cust", label: "Custom", href: "/custom/", icon: customSvg },
         ],
       });
       const brandA = findAll(custom, (n) => n.nodeType === 1 && n.classList.contains("bui-brand"))[0];
@@ -355,9 +417,14 @@ for (const [label, kitPath] of [
       const tabs = findAll(custom, (n) => n.nodeType === 1 && n.classList.contains("bui-tab"));
       assert.equal(tabs[0].tagName, "span");
       assert.equal(tabs[0].getAttribute("href"), null);
+      assert.equal(findAll(tabs[0], (n) => n.nodeType === 1 && n.tagName === "svg").length, 0);
       assert.equal(tabs[1].tagName, "a");
       assert.equal(tabs[1].getAttribute("href"), "https://blindlabs.example/docs");
       assert.equal(tabs[1].getAttribute("aria-current"), "page");
+      const tab1Svg = findAll(tabs[1], (n) => n.nodeType === 1 && n.tagName === "svg")[0];
+      assert.equal(tab1Svg.getAttribute("data-surface"), "mail");
+      assert.equal(findAll(tab1Svg, (n) => n.nodeType === 1 && n.tagName === "path")[0].getAttribute("d"), mailPath);
+      assert.equal(findAll(tabs[2], (n) => n.nodeType === 1 && n.id === "custom-svg").length, 1);
     });
 
     test("kpiStrip supports array shorthand, object options, empty fallback, and XSS escaping", () => {
@@ -400,6 +467,8 @@ for (const [label, kitPath] of [
       assert.ok(s1.classList.contains("bk-dn"));
       assert.ok(!s1.textContent.includes("HIDDEN_BODY"));
       assert.equal(findAll(s1, (n) => n.nodeType === 1 && n.tagName === "svg").length, 1);
+      const chkPath = findAll(s1, (n) => n.nodeType === 1 && n.tagName === "path")[0];
+      assert.ok(chkPath && chkPath.getAttribute("d") && chkPath.getAttribute("d").length >= 8);
 
       assert.equal(s2.getAttribute("data-step-state"), "active");
       assert.ok(s2.classList.contains("bk-act"));
@@ -623,5 +692,16 @@ describe("BlindUI Kit Budgets & Hygiene", () => {
       }
       assert.equal(CLAMP_RE.test(txt), false, `${path.basename(p)} contains forbidden dot-clamp call`);
     }
+
+    // CSS token invariants: 0 gradients, prefers-reduced-motion:reduce, >= 8 distinct @keyframes, .bk-in width:100%.
+    const tokTxt = tokRaw.toString("ascii");
+    for (const g of ["linear-gradient", "radial-gradient", "conic-gradient"]) {
+      assert.equal(tokTxt.includes(g), false, `blindui-tokens.css contains forbidden ${g}`);
+    }
+    assert.ok(tokTxt.includes("prefers-reduced-motion:reduce"), "blindui-tokens.css missing prefers-reduced-motion:reduce");
+    const kfNames = new Set(Array.from(tokTxt.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)/g), (m) => m[1]));
+    assert.ok(kfNames.size >= 8, `blindui-tokens.css needs >= 8 distinct @keyframes, got ${kfNames.size}`);
+    assert.match(tokTxt, /\.bk-in[^{}]*\{[^}]*width:100%/, "blindui-tokens.css missing width:100% on .bk-in");
+    assert.match(tokTxt, /\.bk-bar,\.bui-box,\.bui-pre\{[^}]*max-width:100%/, "blindui-tokens.css missing max-width:100% on overflow boxes");
   });
 });
