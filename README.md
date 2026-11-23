@@ -1,11 +1,11 @@
-# BlindUI
+# Zero-UI
 
-Standalone zero-dependency `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,138` bytes minified) standardized component kit, `4 KB` (`4,087` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
+Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,138` bytes minified) standardized component kit, `4 KB` (`4,087` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
 
 | Property | Specification |
 | :--- | :--- |
 | **Website** | https://blindlabs.ai |
-| **Repository** | https://github.com/blindlabs-ai/blindui |
+| **Repository** | https://github.com/blindlabs-ai/zero-ui |
 | **Core Bundle** | `27,735` bytes (`blindui.min.js`, verified `< 28 KB` hard budget) |
 | **Component Kit** | `8,138` bytes (`blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
 | **Design Tokens** | `4,087` bytes (`blindui-tokens.css`, verified `<= 4 KB` hard budget) |
