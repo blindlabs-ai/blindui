@@ -111,7 +111,7 @@ test_blindui_kit.mjs     # Zero-dep Node.js kit test suite (17 tests across sour
 test_blindui_check.py    # Python unittest suite for blindui_check.py (15 static analysis tests)
 test_blindui_browser.py  # Headless Chrome desktop + mobile touch click-anywhere parity test (optional Playwright)
 LICENSE                  # Apache License, Version 2.0
-NOTICE                   # Attribution, trademark reservation, and server-side scope notice
+NOTICE                   # Attribution and trademark notice
 ```
 
 ---
@@ -145,6 +145,6 @@ Special thanks and a public shoutout to the **Ripwire** team for building zero-d
 
 ## License
 
-Licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE)). See [NOTICE](NOTICE) for attribution, trademark reservations, and proprietary server-side scope boundaries.
+Licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE) and [NOTICE](NOTICE)).
 
 Copyright 2026 Blind Labs (https://blindlabs.ai).
