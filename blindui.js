@@ -1,4 +1,4 @@
-/* BlindUI v1.0.0 - Zero-dep Safe-DOM & linear Safe-Markdown runtime (ES2020). */
+/* Maat v1.0.0 (formerly BlindUI) - Zero-dep Safe-DOM & linear Safe-Markdown runtime (ES2020). */
 ((R) => {
   "use strict";
 
@@ -1026,5 +1026,5 @@
     };
 
   typeof module == "object" && module?.exports && (module.exports = BUI);
-  R && (R.BlindUI = BUI);
+  R && (R.Maat = R.BlindUI = BUI);
 })(typeof globalThis != "undefined" ? globalThis : this);

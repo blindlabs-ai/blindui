@@ -1,4 +1,4 @@
-/* BlindUI Layout Linter v1.0.0 - Runtime DOM/SVG layout & overlap auditor (ES2020). */
+/* Maat Layout Linter v1.0.0 - Runtime DOM/SVG layout & overlap auditor (ES2020). */
 ((G) => {
   "use strict";
 
@@ -283,6 +283,7 @@
     return out;
   };
 
-  (G.BlindUI = typeof G.BlindUI == "object" && G.BlindUI || {}).lintLayout = lintLayout;
+  let u = G.Maat || G.BlindUI;
+  (G.Maat = G.BlindUI = typeof u == "object" && u || {}).lintLayout = lintLayout;
   if (typeof module != "undefined" && module?.exports) module.exports = lintLayout;
 })(typeof globalThis != "undefined" ? globalThis : this);

@@ -1,4 +1,4 @@
-/* BlindUI Kit v1.0.0 - Reusable Safe-DOM components over BlindUI core (ES2020). */
+/* Maat Kit v1.0.0 (formerly BlindUI Kit) - Safe-DOM components over Maat core (ES2020). */
 ((R) => {
   "use strict";
 
@@ -6,7 +6,7 @@
     S = String,
     I = Array.isArray,
     A = Object.assign,
-    X = R.BlindUI || (typeof require < "u" && require("./blindui.js")),
+    X = R.Maat || R.BlindUI || (typeof require < "u" && require("./maat.js")),
     rb = ".row .between",
     sm = ".sm .muted",
     C = A(Object.create(N), {

@@ -1,0 +1,88 @@
+{
+  "ok": true,
+  "bad_legacy_app": {
+    "findings_count": 9,
+    "maat_12_14_count": 6,
+    "by_rule": {
+      "MAAT-12": 3,
+      "MAAT-14": 3,
+      "MAAT-15": 3
+    },
+    "sample_findings": [
+      {
+        "rule": "MAAT-12",
+        "detail": "Entry HTML loads 4 external <script type='module'> waterfall tags (max 2)",
+        "suggested_fix": "Bundle application code into a single synchronous ./app.bundle.js without module waterfall chains."
+      },
+      {
+        "rule": "MAAT-12",
+        "detail": "Entry HTML loads 3 external <link rel='stylesheet'> waterfall tags (max 2)",
+        "suggested_fix": "Consolidate stylesheets into <= 2 local files (e.g. ./maat-tokens.css and ./app.bundle.css)."
+      },
+      {
+        "rule": "MAAT-12",
+        "detail": "script[4]@L28: async boot() awaits before first synchronous render() (blocks frame-1 paint)",
+        "suggested_fix": "Render the initial shell synchronously on frame 1, then run async crypto/network hydration in the background."
+      },
+      {
+        "rule": "MAAT-14",
+        "detail": "Disallowed <iframe src='https://example.com/legacy-embed'> violates strict CSP frame-src 'none' portability",
+        "suggested_fix": "Remove <iframe src=...> or render content natively via Maat Safe-DOM primitives."
+      },
+      {
+        "rule": "MAAT-14",
+        "detail": "External/path <img src='/assets/legacy-banner.png'> violates strict CSP img-src data: portability",
+        "suggested_fix": "Replace external or path-based <img> tags with inline Maat.svg() vectors or data: URIs."
+      },
+      {
+        "rule": "MAAT-14",
+        "detail": "External <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;600&disp'> violates zero-dependency offline CSP portability",
+        "suggested_fix": "Remove external font/CDN links and use local Maat CSS + system font stacks."
+      }
+    ]
+  },
+  "forged_workspace": {
+    "name": "Obsidian Workspace",
+    "archetype": "workspace-drive",
+    "brandColor": "#38bdf8",
+    "static_findings_count": 0,
+    "browser": {
+      "ok": true,
+      "viewports": {
+        "desktop": {
+          "viewport": [
+            1280,
+            800
+          ],
+          "mount_ms": 4.7,
+          "alias_ok": true,
+          "page_errors": [],
+          "findings_count": 0,
+          "findings": []
+        },
+        "mobile": {
+          "viewport": [
+            375,
+            812
+          ],
+          "mount_ms": 3.4,
+          "alias_ok": true,
+          "page_errors": [],
+          "findings_count": 0,
+          "findings": []
+        }
+      }
+    }
+  },
+  "self_audit": {
+    "ok": true,
+    "findings_count": 0,
+    "checked_files": 9,
+    "forged_archetypes": [
+      "tactile-inbox",
+      "workspace-drive",
+      "sql-studio",
+      "openapi-console"
+    ]
+  }
+}

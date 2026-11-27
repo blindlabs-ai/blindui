@@ -1,58 +1,64 @@
-# Zero-UI
+# Maat (formerly Zero-UI / BlindUI)
 
-Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,164` bytes minified) standardized component kit, `8 KB` (`8,112` bytes minified) DOM/SVG layout & overlap linter, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
+Standalone zero-dependency, Feather-of-Truth web substrate: `28 KB` (`27,742` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,169` bytes minified) standardized component kit, `8 KB` (`8,130` bytes minified) DOM/SVG layout & overlap linter, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, self-immune static validator (`MAAT-01..MAAT-16`), and single-bundle app synthesizer (`maat_forge.py`) by [Blind Labs](https://blindlabs.ai).
+
+`window.Maat` and `window.BlindUI` (as well as `maat_check.py` / `blindui_check.py` and `build_maat.py` / `build_blindui.py`) are 100% backwards-compatible aliases (`window.Maat === window.BlindUI`).
 
 | Property | Specification |
 | :--- | :--- |
 | **Website** | https://blindlabs.ai |
 | **Repository** | https://github.com/blindlabs-ai/zero-ui |
-| **Core Bundle** | `27,735` bytes (`blindui.min.js`, verified `< 28 KB` hard budget) |
-| **Component Kit** | `8,164` bytes (`blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
-| **Layout Linter** | `8,112` bytes (`blindui-layout-lint.min.js`, verified `<= 8 KB` hard budget) |
-| **Design Tokens** | `4,094` bytes (`blindui-tokens.css`, verified `<= 4 KB` hard budget) |
+| **Core Bundle** | `27,742` bytes (`maat.min.js` / `blindui.min.js`, verified `< 28 KB` hard budget) |
+| **Component Kit** | `8,169` bytes (`maat-kit.min.js` / `blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
+| **Layout Linter** | `8,130` bytes (`maat-layout-lint.min.js` / `blindui-layout-lint.min.js`, verified `<= 8 KB` hard budget) |
+| **Design Tokens** | `4,094` bytes (`maat-tokens.css` / `blindui-tokens.css`, verified `<= 4 KB` hard budget) |
 | **Runtime Dependencies** | `0` `npm` packages, `0` `pip` packages (pure ES2020 + Python 3 stdlib) |
-| **Security Posture** | Strict tag/attribute/URL allowlists, `O(n)` Safe-Markdown, `BUI-01..BUI-11` static AST/CSS/HTML gate |
+| **Security & Quality Gate** | Strict allowlists, `O(n)` Safe-Markdown, `MAAT-01..MAAT-16` (`BUI-01..BUI-11` compat) + `MAAT-16 --self` |
+| **App Synthesizer** | `maat_forge.py` (4 archetypes: `tactile-inbox`, `workspace-drive`, `sql-studio`, `openapi-console`) |
 | **License** | Apache License, Version 2.0 ([LICENSE](LICENSE) & [NOTICE](NOTICE)) |
 
 ---
 
-## Why BlindUI?
+## The Feather-of-Truth Philosophy
 
-- **Safe-DOM Construction by Default (`BlindUI.h`, `BlindUI.svg`, `BlindUI.sanitizeUrl`):** Strictly allowlists HTML and SVG tags/attributes, enforces `blob:` origin isolation on `<iframe>` previews, validates `https:` and header-safe `mailto:` URLs, and eliminates raw HTML parsing or dynamic script-execution sinks across the entire runtime.
-- **Linear-Time Safe-Markdown & Rich Editors (`BlindUI.md`, `BlindUI.bindMdEditor`, `BlindUI.notionEditor`):** Single-pass `O(n)` Markdown rendering and block/raw editing with click-anywhere vertical placement (`focusAtPoint`, `getActiveRow`), tested against 30+ XSS payload classes and pathological nested inputs without catastrophic regex backtracking (ReDoS).
-- **Zero-Framework UI Primitives (`BlindUI.modal`, `BlindUI.bindAction`, `BlindUI.bindGroup`, `BlindUI.defineRoutes`, `BlindUI.api`):** Responsive docked/sheet modal controller with focus restoration, delegated selector/action wiring, optional request signing (`setSigner`), and client-side request/response schema validation.
-- **Standardized Component Kit & Obsidian Tokens (`BlindUI.kit.*` + `blindui-tokens.css`):** Companion `8,164`-byte library built strictly on `BlindUI.h` and `BlindUI.svg` providing 14-surface geometric SVG icons, ready-to-mount application shells, KPI strips, step rails, one-time secret API key cards, tabbed code blocks, status pills, and live API runner panels styled by a `4,094`-byte obsidian CSS token sheet with per-surface colors and reduced-motion micro-animations.
-- **Runtime DOM/SVG Layout & Overlap Linter (`BlindUI.lintLayout` + `examples/layout-linter/`):** Companion `8,112`-byte ES2020 geometry auditor (`blindui-layout-lint.min.js`) catching `LINT-FLEX-SHRINK-CLIP` (CSS Flexbox 4.5 min-height collapse), `LINT-SIBLING-OVERLAP` (including negative-margin interactive bleed), `LINT-SVG-TEXT-OVERLAP` (ERD-pill aware), `LINT-TEXT-CLIPPED`, and `LINT-VIEWPORT-BLEED-X` with actionable `suggestedFix` guidance. See the runnable broken-vs-fixed counterfactual walkthrough in [examples/layout-linter/](examples/layout-linter/).
-- **Static Full-Stack Contract & Hygiene Gate (`blindui_check.py` + `build_blindui.py`):** Audits web frontends and Python backends via `ast.parse()` and `HTMLParser` (never executing target code) for unsafe DOM sinks, unescaped templating, unbound UI actions, route drift, CSP headers, static CSS layout traps (`BUI-11`), and byte-exact `blindui.min.js` / `blindui-kit.min.js` / `blindui-layout-lint.min.js` reproducibility.
+Every Maat artifact is weighed against strict deterministic budgets before shipping:
+
+- **Featherweight Byte Ceilings:** Core runtime `< 28 KB`, component kit `<= 8 KB`, DOM/SVG layout linter `<= 8 KB`, and obsidian tokens `<= 4 KB` -- deterministically minified and byte-synced with `blindui*` compatibility mirrors via `build_maat.py`.
+- **Synchronous Frame-1 Boot (`< 15 ms`):** No `async` boot waterfalls or blocking network/crypto calls before first paint (`MAAT-12`).
+- **Safe-DOM & Strict CSP Portability (`MAAT-01`, `MAAT-14`):** Allowlisted `Maat.h`, `Maat.svg`, `Maat.md`, and `Maat.sanitizeUrl` eliminate raw HTML injection sinks, third-party CDNs, external `<img>` loads, and `<iframe>` embeds.
+- **Bespoke Visual Identity & Tactile Mobile Safety (`MAAT-11`, `MAAT-13`, `MAAT-15`):** Rejects trademark palette/SVG clones, enforces `flex-shrink: 0` + touch containment on mobile scroll/swipe rows, and requires collision-free pill labels on SVG/ERD diagrams.
+- **Self-Immune Verification (`MAAT-16`):** `python3 maat_check.py --self` audits Maat's own JS/CSS/Python sources, bundle budgets, mirror parity, and all four `maat_forge.py` archetypes.
 
 ---
 
 ## Quickstart
 
-Load `blindui.min.js` (and optionally `blindui-tokens.css` + `blindui-kit.min.js`) directly via `<link>` / `<script>` tags (`window.BlindUI`, `window.BlindUI.kit`) or `require(...)` in CommonJS/Node test harnesses:
+Load `maat.min.js` alongside `maat-tokens.css`, `maat-kit.min.js`, and `maat-layout-lint.min.js` (`window.Maat === window.BlindUI`):
 
 ```html
-<link rel="stylesheet" href="./blindui-tokens.css">
+<link rel="stylesheet" href="./maat-tokens.css">
 <div id="app"></div>
-<script src="./blindui.min.js"></script>
-<script src="./blindui-kit.min.js"></script>
+<script src="./maat.min.js"></script>
+<script src="./maat-kit.min.js"></script>
+<script src="./maat-layout-lint.min.js"></script>
 <script>
-  const { h, md, bindAction, kit } = window.BlindUI;
+  const { h, md, bindAction, kit, lintLayout } = window.Maat;
 
   const main = h(
     "div",
     { className: "bui-col" },
     kit.kpiStrip([
-      { label: "Core Bundle", value: "27,735 B", tone: "ok", sub: "< 28 KB budget" },
-      { label: "Kit Bundle", value: "8,164 B", tone: "ok", sub: "<= 8 KB budget" },
+      { label: "Core Bundle", value: "27,742 B", tone: "ok", sub: "< 28 KB budget" },
+      { label: "Kit Bundle", value: "8,169 B", tone: "ok", sub: "<= 8 KB budget" },
+      { label: "Layout Linter", value: "8,130 B", tone: "ok", sub: "<= 8 KB budget" },
       { label: "CSS Tokens", value: "4,094 B", tone: "ok", sub: "<= 4 KB budget" }
     ]),
     h(
       "section",
       { className: "bui-card" },
-      h("h2", null, "Zero-Knowledge Workspace"),
+      h("h2", null, "Feather-Verified Workspace"),
       md("Verified **Safe-DOM** rendering with `0` unsafe HTML sinks."),
-      h("button", { id: "verify-btn", className: "bui-btn bui-btn-primary", type: "button" }, "Verify Session")
+      h("button", { id: "verify-btn", className: "bui-btn bui-btn-primary", type: "button" }, "Verify Layout")
     )
   );
 
@@ -60,14 +66,27 @@ Load `blindui.min.js` (and optionally `blindui-tokens.css` + `blindui-kit.min.js
     mount: document.getElementById("app"),
     surface: "developers",
     main,
-    footer: "Powered by BlindUI"
+    footer: "Powered by Maat"
   });
 
-  bindAction("verify-btn", () => console.log("BlindUI v" + window.BlindUI.version));
+  bindAction("verify-btn", () => console.log("Findings:", lintLayout(document.body).length));
 </script>
 ```
 
-### Public Runtime Surface (`window.BlindUI`)
+### App Forge (`maat_forge.py`)
+
+Synthesize a complete strict-CSP, single-bundle application from a JSON blueprint and self-verify it statically (`MAAT-01..16`) and in headless Chromium (`Maat.lintLayout` at `1280x800` and `375x812`):
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 maat_forge.py \
+  --spec examples/app-forge/workspace_spec.json \
+  --out /tmp/maat-workspace \
+  --verify --json
+```
+
+Supported archetypes: `tactile-inbox`, `workspace-drive`, `sql-studio`, and `openapi-console`. See the runnable bad-legacy-vs-forged walkthrough in [examples/app-forge/](examples/app-forge/).
+
+### Public Runtime Surface (`window.Maat` / `window.BlindUI`)
 
 | Export | Purpose |
 | :--- | :--- |
@@ -76,62 +95,46 @@ Load `blindui.min.js` (and optionally `blindui-tokens.css` + `blindui-kit.min.js
 | `sanitizeUrl(url, options?)` | Validate `https:` and header-safe `mailto:` URLs (plus opt-in `allowRelative` / `allowDownloadBlob`) |
 | `md(markdownText)` | Render untrusted Markdown in `O(n)` time into a safe `DocumentFragment` |
 | `bindMdEditor(opts)` | Bind toolbar formatting, live Safe-Markdown preview, and keyboard shortcuts to a `<textarea>` |
-| `notionEditor(container, opts)` | Mount an interactive block-structured + raw Markdown editor with click-anywhere vertical placement (`focusAtPoint`, `getActiveRow`) and lossless live serialization |
+| `notionEditor(container, opts)` | Mount an interactive block-structured + raw Markdown editor with click-anywhere vertical placement (`focusAtPoint`, `getActiveRow`) |
 | `modal(id, opts?)` | Accessible modal / docked panel / mobile-sheet state machine (`open`, `close`, `dock`, `expand`) |
-| `bindAction(id, fn, event?)` | Bind an event handler by element ID and register the binding for static `BUI-04` verification |
+| `bindAction(id, fn, event?)` | Bind an event handler by element ID and register the binding for static `MAAT-04` (`BUI-04`) verification |
 | `bindGroup(selector, fn, event?)` | Delegate events cleanly across matching child elements without inline event attributes |
 | `defineRoutes(map)` / `api(route, opts?)` | Declare typed client route schemas and execute schema-checked, optionally signed `fetch` calls |
+| `kit.*` | Eight Safe-DOM primitives (`icon`, `shell`, `kpiStrip`, `stepRail`, `keyCard`, `codeBlock`, `statusPill`, `tryItPanel`) |
+| `lintLayout(root?, opts?)` | Live DOM/SVG geometry auditor (`LINT-FLEX-SHRINK-CLIP`, `LINT-SIBLING-OVERLAP`, `LINT-SVG-TEXT-OVERLAP`, `LINT-TEXT-CLIPPED`, `LINT-VIEWPORT-BLEED-X`) |
 
-### Standardized Component Kit (`window.BlindUI.kit`)
+### Static Validator Rules (`MAAT-01..MAAT-16` / `BUI-01..BUI-11`)
 
-Load `blindui-kit.min.js` (`8,164` bytes) alongside `blindui-tokens.css` (`4,094` bytes) after `blindui.min.js` to attach eight reusable Safe-DOM primitives to `window.BlindUI.kit`:
+| Rule | Alias | Check |
+| :--- | :--- | :--- |
+| `MAAT-01..10` | `BUI-01..10` | XSS sinks, duplicate hoisted functions, JS syntax, unwired controls, route parity, user-facing jargon, ASCII/no-dot-clamp, key-safety, bundle parity, CSP headers |
+| `MAAT-11` | `BUI-11` | Static CSS layout traps (flex-scroll shrink-clip, negative margins, fixed bottom nav/FAB clearance) |
+| `MAAT-12` | -- | No async boot waterfall (`await` before frame-1 `render()`, max 2 module scripts & 2 stylesheets) |
+| `MAAT-13` | -- | No third-party vendor trademark color-combo or SVG path clones |
+| `MAAT-14` | -- | Strict CSP portability (no `<iframe src=...>`, no non-`data:` `<img src=...>`, no external CDN/font URLs or CSS `@import`) |
+| `MAAT-15` | -- | Tactile mobile & SVG safety (pill/offset SVG midpoint text, mobile row `flex-shrink: 0`, swipe container containment) |
+| `MAAT-16` | -- | Self-immune audit (`python3 maat_check.py --self`) verifying Maat's own bundles, mirrors, sources, and forged archetypes |
 
-| Export | Purpose |
-| :--- | :--- |
-| `kit.icon(id, size?)` | Crisp 24x24 geometric SVG icon across 14 canonical surfaces (`blog`, `benchmarks`, `apps`, `developers`, `chain`, `mail`, `sign`, `social`, `finance`, `live`, `call`, `cdn`, `github`, `home`) with safe `apps` fallback and `data-surface` color/motion hook |
-| `kit.shell(opts)` | Sticky suite header, sanitized brand/nav links with active surface state and per-surface icons, main container, and optional footer |
-| `kit.kpiStrip(opts \| items)` | Responsive metric card grid with tabular numerals, semantic tones (`ok`, `warn`, `err`), and safe empty fallbacks |
-| `kit.stepRail(opts \| steps)` | Multi-step workflow rail (`todo`, `active`, `done`) with SVG checkmarks and collapsed completed bodies |
-| `kit.keyCard(opts)` | API key lifecycle card with prefix display, quota progress bar, one-time dismissible `secretOnce` reveal/copy, and single-flight `aria-busy` rotate/revoke locks |
-| `kit.codeBlock(opts)` | Accessible tabbed code snippet viewer (`role="tablist"`, `aria-selected`, `data-lang`) with clipboard copy button |
-| `kit.statusPill(opts)` | Compact uppercase status badge with indicator dot and allowlisted semantic tone classes |
-| `kit.tryItPanel(opts)` | Interactive preset-driven API runner with JSON/text payload editor, `BlindUI.api` fallback, latency/quota readout, and `429`/error handling |
-
-### Runtime Layout & Overlap Linter (`window.BlindUI.lintLayout`)
-
-Load `blindui-layout-lint.min.js` (`8,112` bytes, `<= 8 KB` budget) in any browser page or Node test harness to audit live DOM and SVG geometry (`BlindUI.lintLayout(root?, opts?)`). Every finding returns `{ rule, selector, detail, rectA, rectB, suggestedFix }` across five rules:
-
-- `LINT-FLEX-SHRINK-CLIP`: Flex children shrunk below intrinsic scroll dimensions (`flex-shrink > 0` + clipping).
-- `LINT-SIBLING-OVERLAP`: Direct sibling or interactive descendant-vs-uncle bounding-box overlaps (detects negative-margin bleed while ignoring `pointer-events: none` swipe layers).
-- `LINT-SVG-TEXT-OVERLAP`: SVG/ERD label collisions against labels, `.erd-card`/`.erd-node`, and non-pill `<rect>` elements (exempts `.erd-lbl-bg` and `<g class="erd-edge-lbl">` pills).
-- `LINT-TEXT-CLIPPED`: Unintentional clipped vertical/horizontal text (exempts `-webkit-line-clamp` and intentional single-line ellipsis).
-- `LINT-VIEWPORT-BLEED-X`: Horizontal root or unclipped child overflow beyond viewport bounds (exempts parked offscreen fixed drawers).
-
-Try the self-contained mobile inbox broken-vs-fixed demo in [examples/layout-linter/](examples/layout-linter/) (`run_lint_demo.py` + [sample_report.json](examples/layout-linter/sample_report.json)).
+See also the mobile inbox layout linter counterfactual walkthrough in [examples/layout-linter/](examples/layout-linter/).
 
 ---
 
 ## Repository Layout
 
 ```text
-blindui.js                    # Readable ES2020 Safe-DOM, Safe-Markdown, editor, modal, and API runtime
-blindui.min.js                # Deterministic minified core production bundle (27,735 bytes, < 28 KB)
-blindui-kit.js                # Readable ES2020 standardized 8-primitive component kit (BlindUI.kit)
-blindui-kit.min.js            # Deterministic minified component kit bundle (8,164 bytes, <= 8 KB)
-blindui-layout-lint.js        # Readable ES2020 runtime DOM/SVG layout & overlap auditor (BlindUI.lintLayout)
-blindui-layout-lint.min.js    # Deterministic minified layout linter bundle (8,112 bytes, <= 8 KB)
-blindui-tokens.css            # Obsidian design token & component utility stylesheet (4,094 bytes, <= 4 KB)
-build_blindui.py              # Zero-dependency deterministic ES2020 minifier & bundle/token verifier (--check)
-blindui_check.py              # Static UI-to-server contract, XSS & CSS layout validator (rules BUI-01..BUI-11)
-examples/layout-linter/       # Broken vs. fixed mobile inbox HTML demo, Playwright runner & sample JSON report
-test_blindui.mjs              # Zero-dep Node.js core test suite (32 tests across source + minified bundles)
-test_blindui_kit.mjs          # Zero-dep Node.js kit test suite (19 tests across source + minified bundles + budgets)
-test_blindui_layout_lint.mjs  # Zero-dep Node.js layout linter suite across source + minified bundles (5 rules + pills)
-test_blindui_check.py         # Python unittest suite for blindui_check.py (BUI-01..BUI-11 counterfactuals)
-test_blindui.py               # Python suite verifying build budgets, static BUI-11 & layout-linter demo
-test_blindui_browser.py       # Headless Chrome desktop + mobile touch click-anywhere parity test (optional Playwright)
-LICENSE                       # Apache License, Version 2.0
-NOTICE                        # Attribution and trademark notice
+maat.js / maat.min.js                      # Core ES2020 Safe-DOM, Safe-Markdown, editor, modal & API runtime (27,742 B)
+maat-kit.js / maat-kit.min.js              # Standardized 8-primitive component kit (8,169 B)
+maat-layout-lint.js / maat-layout-lint.min.js # Runtime DOM/SVG layout & overlap auditor (8,130 B)
+maat-tokens.css                            # Obsidian design token & component utility stylesheet (4,094 B)
+blindui*.js / blindui-tokens.css           # Byte-synced backwards-compatibility mirrors (window.BlindUI === window.Maat)
+build_maat.py / build_blindui.py           # Zero-dependency deterministic ES2020 minifier & bundle/mirror verifier
+maat_check.py / blindui_check.py           # Static security, route-parity, layout & self-immune validator (MAAT-01..16)
+maat_forge.py                              # Zero-dependency 4-archetype strict-CSP single-bundle app synthesizer
+examples/layout-linter/                    # Broken vs. fixed mobile inbox HTML demo, Playwright runner & sample report
+examples/app-forge/                        # Bad legacy app vs. forged workspace demo, blueprint spec & sample report
+test_blindui*.mjs / test_blindui*.py       # Node & Python core, kit, layout linter, and BUI-01..11 test suites
+test_maat_forge_and_rules.py               # Counterfactual MAAT-12..16, App Forge, and window.Maat parity suite
+LICENSE / NOTICE                           # Apache License, Version 2.0 & attribution notice
 ```
 
 ---
@@ -139,25 +142,23 @@ NOTICE                        # Attribution and trademark notice
 ## Verification & Test Suite
 
 ```bash
-# 1. Verify deterministic minified bundles & token CSS match sources and byte budgets
+# 1. Verify deterministic minified bundles, byte budgets, and BlindUI mirrors
+PYTHONDONTWRITEBYTECODE=1 python3 build_maat.py --check --require-node
 PYTHONDONTWRITEBYTECODE=1 python3 build_blindui.py --check --require-node
 
-# 2. Run core Safe-DOM, Safe-Markdown, URL sanitizer, editor, modal, and XSS suite (32/32 tests)
+# 2. Run MAAT-16 self-immune audit across Maat sources, bundles, and all 4 forge archetypes
+PYTHONDONTWRITEBYTECODE=1 python3 maat_check.py --self
+
+# 3. Run Node.js core, kit, and runtime layout linter suites
 node test_blindui.mjs
+node --test test_blindui_kit.mjs test_blindui_layout_lint.mjs
 
-# 3. Run component kit, icon, XSS escaping, single-flight lock, and budget suite (19/19 tests)
-node --test test_blindui_kit.mjs
+# 4. Run Python static rules, App Forge, and browser verification suites
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_blindui_check.py test_blindui.py test_maat_forge_and_rules.py
 
-# 4. Run runtime DOM/SVG layout linter counterfactual & budget suite
-node --test test_blindui_layout_lint.mjs
-
-# 5. Run static security, route-parity, and BUI-11 layout analyzer suites
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_blindui_check.py test_blindui.py
-
-# 6. Run layout linter broken-vs-fixed mobile inbox browser demo (requires Playwright + Chromium)
+# 5. Run interactive browser counterfactual demos (requires Playwright + Chromium)
 PYTHONDONTWRITEBYTECODE=1 python3 examples/layout-linter/run_lint_demo.py
-
-# 7. Run real-browser desktop + mobile click-anywhere parity suite (requires Playwright + Chromium)
+PYTHONDONTWRITEBYTECODE=1 python3 examples/app-forge/run_forge_demo.py
 PYTHONDONTWRITEBYTECODE=1 python3 test_blindui_browser.py
 ```
 
@@ -165,7 +166,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 test_blindui_browser.py
 
 ## Acknowledgments
 
-Special thanks and a public shoutout to the **Ripwire** team for building zero-dependency static code analysis, AST lint checks, structural clone detection, and ranked symbol mapping tooling. Ripwire's commitment to structural clarity and zero-bloat engineering helped keep BlindUI's runtime, component kit, minifier, and static security gate small and auditable.
+Special thanks and a public shoutout to the **Ripwire** team for building zero-dependency static code analysis, AST lint checks, structural clone detection, and ranked symbol mapping tooling. Ripwire's commitment to structural clarity and zero-bloat engineering helped keep Maat's runtime, component kit, minifier, app forge, and static security gate small and auditable.
 
 ---
 

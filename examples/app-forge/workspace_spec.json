@@ -1,0 +1,54 @@
+{
+  "name": "Obsidian Workspace",
+  "archetype": "workspace-drive",
+  "brandColor": "#38bdf8",
+  "collections": [
+    {
+      "title": "Q4 Architecture Blueprint",
+      "kind": "Doc",
+      "updated": "2m ago",
+      "size": "48 KB",
+      "summary": "Zero-dependency **Safe-DOM** client architecture with strict CSP and sync frame-1 paint."
+    },
+    {
+      "title": "Mobile Gesture & Layout Spec",
+      "kind": "Note",
+      "updated": "14m ago",
+      "size": "19 KB",
+      "summary": "Tactile swipe containment (`touch-action: pan-y`), `flex-shrink: 0`, and `44px` tap targets."
+    },
+    {
+      "title": "Release Verification Checklist",
+      "kind": "Sheet",
+      "updated": "1h ago",
+      "size": "32 KB",
+      "summary": "Automated `MAAT-01..16` static audit and headless Chromium `Maat.lintLayout()` checks."
+    },
+    {
+      "title": "Offline Sync Snapshot",
+      "kind": "Archive",
+      "updated": "3h ago",
+      "size": "124 KB",
+      "summary": "Private local-first workspace state verified with zero external CDNs or iframes."
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/items",
+      "desc": "List workspace documents"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/items",
+      "desc": "Create local-first document"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "desc": "Verify runtime health"
+    }
+  ],
+  "e2ee": true,
+  "tactileMobile": true
+}

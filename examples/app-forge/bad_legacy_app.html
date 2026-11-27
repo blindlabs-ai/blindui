@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Legacy Waterfall App (Counterfactual Fixture)</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+  <link rel="stylesheet" href="./legacy-base.css">
+  <link rel="stylesheet" href="./legacy-theme.css">
+  <style>
+    .inbox-row {
+      display: flex;
+      padding: 12px;
+    }
+    .msg-swipe-wrap {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <main id="legacy-root">
+    <img src="/assets/legacy-banner.png" alt="Legacy Banner">
+    <iframe src="https://example.com/legacy-embed" title="External Embed"></iframe>
+  </main>
+  <script type="module" src="./mod-config.js"></script>
+  <script type="module" src="./mod-auth.js"></script>
+  <script type="module" src="./mod-store.js"></script>
+  <script type="module" src="./mod-render.js"></script>
+  <script>
+    function render() {
+      var el = document.getElementById("legacy-root");
+      if (el) el.setAttribute("data-ready", "1");
+    }
+    async function boot() {
+      await fetch("/api/v1/bootstrap");
+      render();
+    }
+    boot();
+  </script>
+</body>
+</html>
