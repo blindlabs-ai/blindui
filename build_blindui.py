@@ -22,6 +22,7 @@ from typing import List, Optional, Tuple
 MAX_BUNDLE_BYTES = 28672
 MAX_KIT_BYTES = 8192
 MAX_TOKENS_BYTES = 4096
+MAX_LINT_BYTES = 8192
 
 # Constructed dynamically so this file itself never contains raw sink literals.
 _FORBIDDEN_SUBSTRINGS: Tuple[Tuple[str, str], ...] = (
@@ -861,13 +862,29 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     tokens_path = here / "blindui-tokens.css"
     tokens_res = validate_css_tokens(tokens_path, max_bytes=MAX_TOKENS_BYTES)
+    lint_src = here / "blindui-layout-lint.js"
+    lint_out = here / "blindui-layout-lint.min.js"
+    lint_res = build_and_verify(
+        src_path=lint_src,
+        out_path=lint_out,
+        check_only=args.check,
+        require_node=args.require_node,
+        max_bytes=MAX_LINT_BYTES,
+        inclusive=True,
+    )
 
-    all_errors = list(core_res["errors"]) + list(kit_res["errors"]) + list(tokens_res["errors"])
+    all_errors = (
+        list(core_res["errors"])
+        + list(kit_res["errors"])
+        + list(tokens_res["errors"])
+        + list(lint_res["errors"])
+    )
     combined = {
         "ok": len(all_errors) == 0,
         "core": core_res,
         "kit": kit_res,
         "tokens": tokens_res,
+        "lint": lint_res,
         "errors": all_errors,
     }
     if args.json:
@@ -890,6 +907,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 f"OK: blindui-tokens.css {tokens_res['bytes']} bytes "
                 f"(<= {tokens_res['budget_bytes']}B, headroom {tokens_res['headroom_bytes']}B, "
                 f"sha256={tokens_res['sha256'][:16]})"
+            )
+        if lint_res["ok"]:
+            print(
+                f"OK: blindui-layout-lint.min.js {lint_res['min_bytes']} bytes "
+                f"(<= {lint_res['budget_bytes']}B, headroom {lint_res['headroom_bytes']}B, "
+                f"sha256={lint_res['sha256'][:16]})"
             )
         for err in all_errors:
             print(f"FAIL: {err}", file=sys.stderr)

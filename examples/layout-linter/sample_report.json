@@ -1,0 +1,57 @@
+{
+  "ok": true,
+  "viewport": {
+    "width": 375,
+    "height": 812
+  },
+  "broken": {
+    "findings_count": 70,
+    "by_rule": {
+      "LINT-FLEX-SHRINK-CLIP": 48,
+      "LINT-SIBLING-OVERLAP": 22
+    },
+    "sample_findings": [
+      {
+        "rule": "LINT-FLEX-SHRINK-CLIP",
+        "selector": "div.msg-swipe-wrap",
+        "detail": "div.msg-swipe-wrap shrunk 51<106px in main#inbox-list",
+        "rectA": {
+          "x": 0,
+          "y": 56,
+          "w": 375,
+          "h": 52.38
+        },
+        "rectB": {
+          "x": 0,
+          "y": 56,
+          "w": 375,
+          "h": 756
+        },
+        "suggestedFix": "Add flex-shrink: 0 to div.msg-swipe-wrap"
+      },
+      {
+        "rule": "LINT-SIBLING-OVERLAP",
+        "selector": "button.star-btn",
+        "detail": "button.star-btn overlaps div.msg-subject-line (252 px^2)",
+        "rectA": {
+          "x": 325,
+          "y": 95,
+          "w": 44,
+          "h": 44
+        },
+        "rectB": {
+          "x": 66,
+          "y": 87,
+          "w": 295,
+          "h": 15
+        },
+        "suggestedFix": "Remove negative margin on button.star-btn; use gap/padding"
+      }
+    ]
+  },
+  "fixed": {
+    "findings_count": 0,
+    "by_rule": {},
+    "sample_findings": []
+  }
+}

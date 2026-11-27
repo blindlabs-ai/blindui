@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixed Mobile Inbox - BlindUI Layout Linter Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #0b0e14;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  .shell {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .topbar {
+    flex-shrink: 0;
+    height: 56px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #222938;
+    background: #101520;
+  }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .status-badge { font-size: 12px; color: #34d399; }
+  .msg-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0 calc(144px + env(safe-area-inset-bottom));
+  }
+  /* FIX 1: flex-shrink: 0 preserves intrinsic row height in flex scroll containers */
+  .msg-swipe-wrap {
+    display: block;
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-bottom: 1px solid #1e2636;
+    background: #0b0e14;
+  }
+  .swipe-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .msg-row {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 78px;
+    padding: 12px 14px;
+    background: #0b0e14;
+  }
+  .msg-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1e293b;
+    color: #c7d2fe;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .msg-body-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .msg-top-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .msg-subject-line {
+    display: flex;
+    align-items: center;
+    font-size: 13.5px;
+    color: #d0d7de;
+  }
+  .msg-subject {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .msg-snippet-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .msg-snippet {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    color: #8b949e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* FIX 2: Remove negative margin while preserving 44x44 accessible tap target */
+  .star-btn {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: #fbbf24;
+    font-size: 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .msg-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .mini-pill {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #1f2937;
+    color: #93c5fd;
+  }
+  .mobile-compose-fab {
+    position: fixed;
+    right: 16px;
+    bottom: 20px;
+    height: 48px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 24px;
+    background: #4f46e5;
+    color: #ffffff;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <h1>Inbox (Fixed Demo)</h1>
+    <span id="lint-status" class="status-badge">Pending</span>
+  </header>
+  <main id="inbox-list" class="msg-list"></main>
+  <button id="compose-fab" class="mobile-compose-fab" type="button">Compose</button>
+</div>
+<script src="../../blindui-layout-lint.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const listEl = document.getElementById("inbox-list");
+  const senders = [
+    "Security Team <security@blindlabs.ai>",
+    "Maya Lin <maya@example.com>",
+    "Release Bot <noreply@example.com>",
+    "Billing Desk <billing@example.com>",
+    "Devon Park <devon@example.com>"
+  ];
+  const subjects = [
+    "Quarterly audit sign-off and mobile inbox review",
+    "Action required: verify Q4 deployment checklist",
+    "Layout linter verified across desktop and mobile",
+    "Invoice #INV-2026-1042 ready for review",
+    "Weekly engineering sync summary and next steps"
+  ];
+  const snippets = [
+    "Please confirm row height and touch-target separation on 375px screens.",
+    "Attached is the revised timeline and regression checklist for this week.",
+    "Zero external dependencies and deterministic minified bundle budgets."
+  ];
+  for (let i = 0; i < 16; i++) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg-swipe-wrap";
+    const bg = document.createElement("div");
+    bg.className = "swipe-bg";
+    const row = document.createElement("div");
+    row.className = "msg-row";
+    const av = document.createElement("div");
+    av.className = "msg-avatar";
+    av.textContent = senders[i % senders.length].slice(0, 2).toUpperCase();
+    const col = document.createElement("div");
+    col.className = "msg-body-col";
+    const top = document.createElement("div");
+    top.className = "msg-top-line";
+    const snd = document.createElement("span");
+    snd.textContent = senders[i % senders.length];
+    const tm = document.createElement("span");
+    tm.textContent = (i + 1) + "m";
+    top.appendChild(snd);
+    top.appendChild(tm);
+    const subjLine = document.createElement("div");
+    subjLine.className = "msg-subject-line";
+    const subj = document.createElement("div");
+    subj.className = "msg-subject";
+    subj.textContent = subjects[i % subjects.length];
+    subjLine.appendChild(subj);
+    const snipLine = document.createElement("div");
+    snipLine.className = "msg-snippet-line";
+    const snip = document.createElement("div");
+    snip.className = "msg-snippet";
+    snip.textContent = snippets[i % snippets.length];
+    const star = document.createElement("button");
+    star.type = "button";
+    star.className = "star-btn";
+    star.textContent = "*";
+    snipLine.appendChild(snip);
+    snipLine.appendChild(star);
+    col.appendChild(top);
+    col.appendChild(subjLine);
+    col.appendChild(snipLine);
+    if (i % 3 === 0) {
+      const badges = document.createElement("div");
+      badges.className = "msg-badges";
+      const pill = document.createElement("span");
+      pill.className = "mini-pill";
+      pill.textContent = "Verified";
+      badges.appendChild(pill);
+      col.appendChild(badges);
+    }
+    row.appendChild(av);
+    row.appendChild(col);
+    wrap.appendChild(bg);
+    wrap.appendChild(row);
+    listEl.appendChild(wrap);
+  }
+  const st = document.getElementById("lint-status");
+  if (window.BlindUI && typeof window.BlindUI.lintLayout === "function") {
+    const res = window.BlindUI.lintLayout(document.body);
+    st.textContent = res.length + " finding(s)";
+  }
+})();
+</script>
+</body>
+</html>

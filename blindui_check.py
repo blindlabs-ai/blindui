@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BlindUI Static Validator (BUI-01 .. BUI-10) - Elysia-style JS-to-Server Parity & XSS/Hygiene Gate.
+BlindUI Static Validator (BUI-01 .. BUI-11) - Elysia-style JS-to-Server Parity, XSS, & Layout Gate.
 
 Zero external dependencies (Python 3 stdlib + sibling build_blindui.py only).
 Never executes target server/UI Python modules; uses ast.parse() and HTMLParser exclusively.
@@ -421,8 +421,16 @@ class _DomInspector(HTMLParser):
             self.visible_chunks.append(data)
 
 
-def _adding_finding(findings: List[Dict[str, str]], rule: str, detail: str) -> None:
-    findings.append({"rule": rule, "detail": detail})
+def _adding_finding(
+    findings: List[Dict[str, str]],
+    rule: str,
+    detail: str,
+    suggested_fix: Optional[str] = None,
+) -> None:
+    item: Dict[str, str] = {"rule": rule, "detail": detail}
+    if suggested_fix:
+        item["suggested_fix"] = suggested_fix
+    findings.append(item)
 
 
 def _check_bui_01(
@@ -1366,6 +1374,455 @@ def _check_bui_10(
             )
 
 
+_STYLE_BLOCK_RE = re.compile(r"<style\b[^>]*>([\s\S]*?)</style>", re.IGNORECASE)
+_LINK_CSS_RE = re.compile(r"<link\b([^>]+)>", re.IGNORECASE)
+_VOID_TAGS = frozenset({
+    "area", "base", "br", "col", "embed", "hr", "img", "input",
+    "link", "meta", "param", "source", "track", "wbr",
+})
+_BUI11_NEG_MARGIN_SEL_RE = re.compile(
+    r"(?:\b(?:button|a|input)\b|\.(?:[a-z0-9_-]*(?:btn|star|chip|tab|pill|badge|link|action|msg-row|list-item|nav-item)[a-z0-9_-]*))",
+    re.IGNORECASE,
+)
+_BUI11_FAB_NAV_RE = re.compile(
+    r"(?:fab|bottom-nav|bottom-bar|tab-bar|sticky-bar|footer-bar|dock)",
+    re.IGNORECASE,
+)
+_BUI11_LIST_SCROLL_RE = re.compile(
+    r"(?:list|feed|inbox|timeline|stream|rows|threads|messages)",
+    re.IGNORECASE,
+)
+_BUI11_OVERLAY_SCROLL_RE = re.compile(
+    r"(?:drawer|modal|dialog|overlay|compose|editor|sheet|popover)",
+    re.IGNORECASE,
+)
+
+
+def _strip_css_comments(css: str) -> str:
+    return re.sub(r"/\*[\s\S]*?\*/", "", css)
+
+
+def _parse_css_decls(body: str) -> Dict[str, str]:
+    decls: Dict[str, str] = {}
+    for part in body.split(";"):
+        if ":" not in part:
+            continue
+        k, v = part.split(":", 1)
+        kl = k.strip().lower()
+        vl = v.strip()
+        if kl and vl:
+            decls[kl] = vl
+    return decls
+
+
+def _parse_css_rules(css: str, scope: str = "base") -> List[Tuple[str, str, Dict[str, str]]]:
+    """Recursively parse CSS blocks into [(scope, selector, decls_dict), ...]."""
+    out: List[Tuple[str, str, Dict[str, str]]] = []
+    n = len(css)
+    i = 0
+    while i < n:
+        while i < n and css[i] in " \t\r\n":
+            i += 1
+        if i >= n:
+            break
+        start = i
+        while i < n and css[i] not in "{;":
+            i += 1
+        if i >= n:
+            break
+        if css[i] == ";":
+            i += 1
+            continue
+        header = re.sub(r"\s+", " ", css[start:i]).strip()
+        depth = 1
+        i += 1
+        bstart = i
+        while i < n and depth > 0:
+            if css[i] == "{":
+                depth += 1
+            elif css[i] == "}":
+                depth -= 1
+            i += 1
+        body = css[bstart:i - 1]
+        if not header:
+            continue
+        if header.startswith("@"):
+            low_h = header.lower()
+            if low_h.startswith(("@media", "@supports", "@layer", "@container")):
+                out.extend(_parse_css_rules(body, scope=header))
+            continue
+        decls = _parse_css_decls(body)
+        if not decls:
+            continue
+        for raw_sel in header.split(","):
+            sel = re.sub(r"\s+", " ", raw_sel).strip()
+            if sel:
+                out.append((scope, sel, decls))
+    return out
+
+
+def _css_len_px(tok: str) -> Optional[float]:
+    t = tok.strip().lower()
+    if t == "0":
+        return 0.0
+    m = re.match(r"^(-?\d+(?:\.\d+)?)(px|rem|em)$", t)
+    if not m:
+        return None
+    val = float(m.group(1))
+    unit = m.group(2)
+    return val * 16.0 if unit in ("rem", "em") else val
+
+
+def _extract_neg_margins(decls: Dict[str, str]) -> List[Tuple[str, str, float]]:
+    hits: List[Tuple[str, str, float]] = []
+    for prop in ("margin-top", "margin-bottom", "margin-left", "margin-right"):
+        if prop in decls:
+            raw = decls[prop].replace("!important", "").strip()
+            px = _css_len_px(raw)
+            if px is not None and px <= -4.0:
+                hits.append((prop, decls[prop], px))
+    if "margin" in decls:
+        raw = decls["margin"].replace("!important", "").strip()
+        parts = raw.split()
+        if 1 <= len(parts) <= 4:
+            for tok in parts:
+                px = _css_len_px(tok)
+                if px is not None and px <= -4.0:
+                    hits.append(("margin", decls["margin"], px))
+                    break
+    return hits
+
+
+def _has_no_shrink(decls: Dict[str, str]) -> bool:
+    fs = decls.get("flex-shrink", "").replace("!important", "").strip().lower()
+    if fs == "0" or (fs.startswith("0.") and float(fs) == 0.0):
+        return True
+    fx = decls.get("flex", "").replace("!important", "").strip().lower()
+    if fx == "none":
+        return True
+    if fx:
+        parts = fx.split()
+        if len(parts) >= 2 and parts[1] == "0":
+            return True
+    return False
+
+
+def _is_flex_grow_fill(decls: Dict[str, str]) -> bool:
+    """Return True if an element explicitly flex-grows to fill remaining space (e.g. flex: 1)."""
+    fg = decls.get("flex-grow", "").replace("!important", "").strip().lower()
+    if fg and fg != "0":
+        return True
+    fx = decls.get("flex", "").replace("!important", "").strip().lower()
+    if fx and fx not in ("none", "initial", "0"):
+        parts = fx.split()
+        if parts and parts[0] not in ("0", "auto", "none") and not parts[0].endswith(("px", "%", "rem", "em", "vh", "vw")):
+            return True
+    return False
+
+
+def _sel_leaf_tokens(sel: str) -> Set[str]:
+    """Return class/id tokens from the rightmost compound selector (ignoring pseudo-classes)."""
+    right = re.split(r"[\s>+~]+", sel.strip())[-1]
+    right = re.sub(r"::?(?:[a-zA-Z0-9_-]+(?:\([^)]*\))?)", "", right)
+    toks: Set[str] = set()
+    for m in re.finditer(r"([.#][A-Za-z0-9_-]+)", right):
+        toks.add(m.group(1))
+    return toks
+
+
+class _NestingParser(HTMLParser):
+    """Collect static HTML parent->child class/id relationships and id->classes mapping."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.stack: List[Tuple[str, Set[str]]] = []
+        self.edges: Dict[str, Set[str]] = {}
+        self.id_classes: Dict[str, Set[str]] = {}
+        self.in_raw = 0
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        t = tag.lower()
+        if t in ("script", "style"):
+            self.in_raw += 1
+            return
+        if self.in_raw:
+            return
+        toks: Set[str] = set()
+        el_id = ""
+        cls_set: Set[str] = set()
+        for k, v in attrs:
+            kl = k.lower()
+            val = (v or "").strip()
+            if kl == "id" and val:
+                el_id = "#" + val
+                toks.add(el_id)
+            elif kl == "class" and val:
+                for c in val.split():
+                    cls_set.add("." + c)
+                    toks.add("." + c)
+        if el_id and cls_set:
+            self.id_classes.setdefault(el_id, set()).update(cls_set)
+        if self.stack and toks:
+            ptoks = self.stack[-1][1]
+            for pt in ptoks:
+                self.edges.setdefault(pt, set()).update(toks)
+        if t not in _VOID_TAGS:
+            self.stack.append((t, toks))
+
+    def handle_endtag(self, tag: str) -> None:
+        t = tag.lower()
+        if t in ("script", "style"):
+            if self.in_raw > 0:
+                self.in_raw -= 1
+            return
+        if self.in_raw:
+            return
+        for idx in range(len(self.stack) - 1, -1, -1):
+            if self.stack[idx][0] == t:
+                del self.stack[idx:]
+                break
+
+
+def _extract_js_dom_edges(
+    tokenized_scripts: List[Tuple[Dict[str, Any], List[Tuple[str, str, bool]]]],
+    id_classes: Dict[str, Set[str]],
+) -> Dict[str, Set[str]]:
+    """Correlate JS getElementById/querySelector/className with appendChild/append calls in order."""
+    edges: Dict[str, Set[str]] = {}
+    for _, toks in tokenized_scripts:
+        var_toks: Dict[str, Set[str]] = {}
+        n = len(toks)
+        for i, (k, v, _) in enumerate(toks):
+            # const listEl = document.getElementById("inbox-list") / querySelector("#x" / ".y")
+            if k == "ident" and v in ("getElementById", "querySelector") and i + 3 < n and toks[i + 1][1] == "(" and toks[i + 2][0] == "str":
+                arg = _unquote_js_string(toks[i + 2][1]).strip()
+                target_toks: Set[str] = set()
+                if v == "getElementById" and arg:
+                    el_id = "#" + arg
+                    target_toks.add(el_id)
+                    target_toks.update(id_classes.get(el_id, ()))
+                elif arg:
+                    target_toks.update(_sel_leaf_tokens(arg))
+                    for tok in list(target_toks):
+                        if tok.startswith("#"):
+                            target_toks.update(id_classes.get(tok, ()))
+                j = i - 1
+                while j >= 1 and toks[j][1] != "=" and i - j < 8:
+                    j -= 1
+                if j >= 1 and toks[j][1] == "=" and toks[j - 1][0] == "ident":
+                    var_toks[toks[j - 1][1]] = set(target_toks)
+            # const wrap = document.createElement("div") -> reset binding for this variable
+            elif k == "ident" and v == "createElement" and i + 3 < n and toks[i + 1][1] == "(":
+                j = i - 1
+                while j >= 1 and toks[j][1] != "=" and i - j < 8:
+                    j -= 1
+                if j >= 1 and toks[j][1] == "=" and toks[j - 1][0] == "ident":
+                    var_toks[toks[j - 1][1]] = set()
+            # wrap.className = "msg-swipe-wrap"
+            elif k == "ident" and v == "className" and i >= 2 and toks[i - 1][1] == "." and toks[i - 2][0] == "ident":
+                if i + 2 < n and toks[i + 1][1] == "=" and toks[i + 2][0] == "str":
+                    var = toks[i - 2][1]
+                    var_toks[var] = {"." + c for c in _unquote_js_string(toks[i + 2][1]).split() if c}
+            # wrap.classList.add("msg-swipe-wrap")
+            elif k == "ident" and v == "add" and i >= 4 and toks[i - 1][1] == "." and toks[i - 2][1] == "classList" and toks[i - 3][1] == "." and toks[i - 4][0] == "ident":
+                if i + 1 < n and toks[i + 1][1] == "(":
+                    args, _ = _split_call_args(toks, i + 1)
+                    var = toks[i - 4][1]
+                    for arg in args:
+                        if len(arg) == 1 and arg[0][0] == "str":
+                            for c in _unquote_js_string(arg[0][1]).split():
+                                var_toks.setdefault(var, set()).add("." + c)
+            # parent.appendChild(child) / parent.append(child)
+            elif k == "ident" and v in ("appendChild", "append") and i >= 2 and toks[i - 1][1] == "." and toks[i - 2][0] == "ident":
+                if i + 1 < n and toks[i + 1][1] == "(":
+                    pvar = toks[i - 2][1]
+                    ptoks = var_toks.get(pvar)
+                    if not ptoks:
+                        continue
+                    args, _ = _split_call_args(toks, i + 1)
+                    for arg in args:
+                        if len(arg) == 1 and arg[0][0] == "ident":
+                            ctoks = var_toks.get(arg[0][1])
+                            if ctoks:
+                                for pt in ptoks:
+                                    edges.setdefault(pt, set()).update(ctoks)
+    return edges
+
+
+def _check_bui_11(
+    html: str,
+    ui_path: Path,
+    tokenized_scripts: List[Tuple[Dict[str, Any], List[Tuple[str, str, bool]]]],
+    findings: List[Dict[str, str]],
+) -> None:
+    """BUI-11: Static CSS layout & overlap guard (flex-scroll shrink-clip, negative margins, fixed FAB clearance)."""
+    css_chunks: List[str] = [m.group(1) for m in _STYLE_BLOCK_RE.finditer(html)]
+    base_dir = ui_path.resolve().parent
+    for m in _LINK_CSS_RE.finditer(html):
+        attrs = m.group(1)
+        if not re.search(r'\brel\s*=\s*["\']?stylesheet\b', attrs, re.IGNORECASE):
+            continue
+        hm = re.search(r'\bhref\s*=\s*["\']([^"\']+)["\']', attrs, re.IGNORECASE)
+        if not hm:
+            continue
+        href = hm.group(1).strip()
+        if href.lower().startswith(("http://", "https://", "//", "data:")):
+            continue
+        css_p = (base_dir / href.lstrip("/")).resolve() if not href.startswith("./") else (base_dir / href).resolve()
+        if not css_p.is_file():
+            css_p = (base_dir / href).resolve()
+        if css_p.is_file():
+            css_chunks.append(css_p.read_text("utf-8", errors="replace"))
+
+    if not css_chunks:
+        return
+
+    all_rules: List[Tuple[str, str, Dict[str, str]]] = []
+    for chunk in css_chunks:
+        all_rules.extend(_parse_css_rules(_strip_css_comments(chunk)))
+    if not all_rules:
+        return
+
+    # Merge declarations per (scope, selector) and compute effective maps (base + scope override).
+    by_scope: Dict[str, Dict[str, Dict[str, str]]] = {}
+    for sc, sel, decls in all_rules:
+        by_scope.setdefault(sc, {}).setdefault(sel, {}).update(decls)
+    base_map = by_scope.get("base", {})
+    scopes = list(by_scope.keys())
+
+    # Collect HTML + JS parent -> child relationships.
+    nest = _NestingParser()
+    nest.feed(html)
+    nest.close()
+    edges: Dict[str, Set[str]] = {k: set(v) for k, v in nest.edges.items()}
+    for k, v in _extract_js_dom_edges(tokenized_scripts, nest.id_classes).items():
+        edges.setdefault(k, set()).update(v)
+
+    seen_flex: Set[Tuple[str, str, str]] = set()
+    seen_neg: Set[Tuple[str, str, str]] = set()
+    seen_fab: Set[Tuple[str, str]] = set()
+
+    for sc in scopes:
+        eff: Dict[str, Dict[str, str]] = {}
+        all_sels = set(base_map.keys()) | set(by_scope.get(sc, {}).keys())
+        for sel in all_sels:
+            merged: Dict[str, str] = {}
+            if sel in base_map:
+                merged.update(base_map[sel])
+            if sc != "base" and sel in by_scope.get(sc, {}):
+                merged.update(by_scope[sc][sel])
+            eff[sel] = merged
+
+        # 1. Flex-scroll child shrink/clip trap
+        flex_scroll_parents: List[Tuple[str, Set[str]]] = []
+        for sel, decls in eff.items():
+            disp = decls.get("display", "").replace("!important", "").strip().lower()
+            fdir = decls.get("flex-direction", "").replace("!important", "").strip().lower()
+            fflow = decls.get("flex-flow", "").replace("!important", "").strip().lower()
+            ovy = decls.get("overflow-y", "").replace("!important", "").strip().lower()
+            ov = decls.get("overflow", "").replace("!important", "").strip().lower()
+            is_flex = disp in ("flex", "inline-flex")
+            is_col = fdir.startswith("column") or "column" in fflow
+            is_scroll = ovy in ("auto", "scroll") or ov in ("auto", "scroll")
+            if is_flex and is_col and is_scroll:
+                ptoks = _sel_leaf_tokens(sel)
+                if ptoks:
+                    flex_scroll_parents.append((sel, ptoks))
+
+        for p_sel, ptoks in flex_scroll_parents:
+            if _BUI11_OVERLAY_SCROLL_RE.search(p_sel):
+                continue
+            child_toks: Set[str] = set()
+            for pt in ptoks:
+                child_toks.update(edges.get(pt, ()))
+            if not child_toks:
+                continue
+            for c_sel, c_decls in eff.items():
+                if c_sel == p_sel:
+                    continue
+                ctoks = _sel_leaf_tokens(c_sel)
+                if not (ctoks & child_toks):
+                    continue
+                c_disp = c_decls.get("display", "").replace("!important", "").strip().lower()
+                c_pos = c_decls.get("position", "").replace("!important", "").strip().lower()
+                if c_disp in ("none", "contents") or c_pos in ("absolute", "fixed"):
+                    continue
+                if _is_flex_grow_fill(c_decls) or "aspect-ratio" in c_decls:
+                    continue
+                c_ov = c_decls.get("overflow", "").replace("!important", "").strip().lower()
+                c_ovy = c_decls.get("overflow-y", "").replace("!important", "").strip().lower()
+                if (c_ov in ("hidden", "clip") or c_ovy in ("hidden", "clip")) and not _has_no_shrink(c_decls):
+                    key = (sc, p_sel, c_sel)
+                    if key not in seen_flex:
+                        seen_flex.add(key)
+                        _adding_finding(
+                            findings,
+                            "BUI-11",
+                            f"Flex-scroll child '{c_sel}' inside '{p_sel}' ({sc}) sets overflow hidden without flex-shrink: 0 (CSS Flexbox 4.5 collapse trap)",
+                            suggested_fix=f"Add 'flex-shrink: 0;' to {c_sel} inside flex scroll container {p_sel}",
+                        )
+
+        # 2. Negative-margin sibling/interactive collision (check declarations introduced in this scope)
+        for sel, decls in by_scope.get(sc, {}).items():
+            if not _BUI11_NEG_MARGIN_SEL_RE.search(sel):
+                continue
+            for prop, val, _ in _extract_neg_margins(decls):
+                key = (sc, sel, prop)
+                if key not in seen_neg:
+                    seen_neg.add(key)
+                    _adding_finding(
+                        findings,
+                        "BUI-11",
+                        f"Negative margin ({prop}: {val}) on '{sel}' ({sc}) risks overlapping adjacent siblings",
+                        suggested_fix=f"Remove negative margin on {sel} and use padding or parent flex/grid gap instead",
+                    )
+
+        # 3. Fixed bottom FAB/nav overlapping scroll container lacking bottom padding clearance
+        fixed_bottom_bars: List[str] = []
+        for sel, decls in eff.items():
+            if not _BUI11_FAB_NAV_RE.search(sel):
+                continue
+            disp = decls.get("display", "").replace("!important", "").strip().lower()
+            pos = decls.get("position", "").replace("!important", "").strip().lower()
+            if disp == "none" or pos != "fixed":
+                continue
+            if "inset" in decls or ("top" in decls and "bottom" in decls):
+                continue
+            if "bottom" in decls:
+                fixed_bottom_bars.append(sel)
+
+        if fixed_bottom_bars:
+            for p_sel, _ in flex_scroll_parents:
+                if _BUI11_OVERLAY_SCROLL_RE.search(p_sel) or not _BUI11_LIST_SCROLL_RE.search(p_sel):
+                    continue
+                p_decls = eff.get(p_sel, {})
+                pb_raw = p_decls.get("padding-bottom", "")
+                pad_raw = p_decls.get("padding", "")
+                has_clearance = False
+                if "calc(" in pb_raw or "env(" in pb_raw or "calc(" in pad_raw or "env(" in pad_raw:
+                    has_clearance = True
+                elif pb_raw:
+                    px = _css_len_px(pb_raw.replace("!important", "").strip())
+                    if px is not None and px >= 48.0:
+                        has_clearance = True
+                elif pad_raw:
+                    parts = pad_raw.replace("!important", "").strip().split()
+                    btok = parts[0] if len(parts) == 1 else (parts[0] if len(parts) == 2 else parts[2])
+                    px = _css_len_px(btok)
+                    if px is not None and px >= 48.0:
+                        has_clearance = True
+                if not has_clearance:
+                    key = (sc, p_sel)
+                    if key not in seen_fab:
+                        seen_fab.add(key)
+                        _adding_finding(
+                            findings,
+                            "BUI-11",
+                            f"Scroll container '{p_sel}' ({sc}) lacks bottom padding clearance for fixed {fixed_bottom_bars[0]}",
+                            suggested_fix=f"Add bottom padding (e.g. 'padding-bottom: calc(120px + env(safe-area-inset-bottom));') to {p_sel}",
+                        )
+
+
 def check_app(
     ui_path: Path,
     server_path: Path,
@@ -1374,7 +1831,7 @@ def check_app(
     blindui_path: Optional[Path] = None,
     sso_server_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Run all active BUI-01..BUI-10 rules and return a structured report."""
+    """Run all active BUI-01..BUI-11 rules and return a structured report."""
     findings: List[Dict[str, str]] = []
 
     html, html_err = extract_html_from_ui(ui_path, html_var=html_var)
@@ -1430,6 +1887,7 @@ def check_app(
     _check_bui_08(surface, html, dom, tokenized_scripts, findings)
     _check_bui_09(blindui_path, ui_path, server_path, findings)
     _check_bui_10(server_path, scripts, findings)
+    _check_bui_11(html, ui_path, tokenized_scripts, findings)
 
     by_rule: Dict[str, int] = {}
     for f in findings:
@@ -1449,7 +1907,7 @@ def check_app(
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="BlindUI Elysia-style static validator (BUI-01..BUI-10)")
+    parser = argparse.ArgumentParser(description="BlindUI Elysia-style static validator (BUI-01..BUI-11)")
     parser.add_argument("--ui", required=True, help="Path to UI .py or .html file")
     parser.add_argument("--server", required=True, help="Path to server .py file")
     parser.add_argument("--surface", required=True, choices=["mail", "sign", "social", "finance", "developers", "live", "call"], help="Target app surface")
@@ -1484,6 +1942,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
             for item in report["findings"]:
                 print(f"  [{item['rule']}] {item['detail']}", file=sys.stderr)
+                if item.get("suggested_fix"):
+                    print(f"    Fix: {item['suggested_fix']}", file=sys.stderr)
     return 0 if report["ok"] else 1
 
 

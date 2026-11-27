@@ -1,6 +1,6 @@
 # Zero-UI
 
-Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,164` bytes minified) standardized component kit, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
+Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,164` bytes minified) standardized component kit, `8 KB` (`8,112` bytes minified) DOM/SVG layout & overlap linter, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, and static UI-to-server security validator by [Blind Labs](https://blindlabs.ai).
 
 | Property | Specification |
 | :--- | :--- |
@@ -8,9 +8,10 @@ Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DO
 | **Repository** | https://github.com/blindlabs-ai/zero-ui |
 | **Core Bundle** | `27,735` bytes (`blindui.min.js`, verified `< 28 KB` hard budget) |
 | **Component Kit** | `8,164` bytes (`blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
+| **Layout Linter** | `8,112` bytes (`blindui-layout-lint.min.js`, verified `<= 8 KB` hard budget) |
 | **Design Tokens** | `4,094` bytes (`blindui-tokens.css`, verified `<= 4 KB` hard budget) |
 | **Runtime Dependencies** | `0` `npm` packages, `0` `pip` packages (pure ES2020 + Python 3 stdlib) |
-| **Security Posture** | Strict tag/attribute/URL allowlists, `O(n)` Safe-Markdown, `BUI-01..BUI-10` static AST/HTML gate |
+| **Security Posture** | Strict tag/attribute/URL allowlists, `O(n)` Safe-Markdown, `BUI-01..BUI-11` static AST/CSS/HTML gate |
 | **License** | Apache License, Version 2.0 ([LICENSE](LICENSE) & [NOTICE](NOTICE)) |
 
 ---
@@ -21,7 +22,8 @@ Standalone zero-dependency, zero-spill `28 KB` (`27,735` bytes minified) Safe-DO
 - **Linear-Time Safe-Markdown & Rich Editors (`BlindUI.md`, `BlindUI.bindMdEditor`, `BlindUI.notionEditor`):** Single-pass `O(n)` Markdown rendering and block/raw editing with click-anywhere vertical placement (`focusAtPoint`, `getActiveRow`), tested against 30+ XSS payload classes and pathological nested inputs without catastrophic regex backtracking (ReDoS).
 - **Zero-Framework UI Primitives (`BlindUI.modal`, `BlindUI.bindAction`, `BlindUI.bindGroup`, `BlindUI.defineRoutes`, `BlindUI.api`):** Responsive docked/sheet modal controller with focus restoration, delegated selector/action wiring, optional request signing (`setSigner`), and client-side request/response schema validation.
 - **Standardized Component Kit & Obsidian Tokens (`BlindUI.kit.*` + `blindui-tokens.css`):** Companion `8,164`-byte library built strictly on `BlindUI.h` and `BlindUI.svg` providing 14-surface geometric SVG icons, ready-to-mount application shells, KPI strips, step rails, one-time secret API key cards, tabbed code blocks, status pills, and live API runner panels styled by a `4,094`-byte obsidian CSS token sheet with per-surface colors and reduced-motion micro-animations.
-- **Static Full-Stack Contract & Hygiene Gate (`blindui_check.py` + `build_blindui.py`):** Audits web frontends and Python backends via `ast.parse()` and `HTMLParser` (never executing target code) for unsafe DOM sinks, unescaped templating, unbound UI actions, route drift, CSP headers, and byte-exact `blindui.min.js` / `blindui-kit.min.js` reproducibility.
+- **Runtime DOM/SVG Layout & Overlap Linter (`BlindUI.lintLayout` + `examples/layout-linter/`):** Companion `8,112`-byte ES2020 geometry auditor (`blindui-layout-lint.min.js`) catching `LINT-FLEX-SHRINK-CLIP` (CSS Flexbox 4.5 min-height collapse), `LINT-SIBLING-OVERLAP` (including negative-margin interactive bleed), `LINT-SVG-TEXT-OVERLAP` (ERD-pill aware), `LINT-TEXT-CLIPPED`, and `LINT-VIEWPORT-BLEED-X` with actionable `suggestedFix` guidance. See the runnable broken-vs-fixed counterfactual walkthrough in [examples/layout-linter/](examples/layout-linter/).
+- **Static Full-Stack Contract & Hygiene Gate (`blindui_check.py` + `build_blindui.py`):** Audits web frontends and Python backends via `ast.parse()` and `HTMLParser` (never executing target code) for unsafe DOM sinks, unescaped templating, unbound UI actions, route drift, CSP headers, static CSS layout traps (`BUI-11`), and byte-exact `blindui.min.js` / `blindui-kit.min.js` / `blindui-layout-lint.min.js` reproducibility.
 
 ---
 
@@ -95,24 +97,41 @@ Load `blindui-kit.min.js` (`8,164` bytes) alongside `blindui-tokens.css` (`4,094
 | `kit.statusPill(opts)` | Compact uppercase status badge with indicator dot and allowlisted semantic tone classes |
 | `kit.tryItPanel(opts)` | Interactive preset-driven API runner with JSON/text payload editor, `BlindUI.api` fallback, latency/quota readout, and `429`/error handling |
 
+### Runtime Layout & Overlap Linter (`window.BlindUI.lintLayout`)
+
+Load `blindui-layout-lint.min.js` (`8,112` bytes, `<= 8 KB` budget) in any browser page or Node test harness to audit live DOM and SVG geometry (`BlindUI.lintLayout(root?, opts?)`). Every finding returns `{ rule, selector, detail, rectA, rectB, suggestedFix }` across five rules:
+
+- `LINT-FLEX-SHRINK-CLIP`: Flex children shrunk below intrinsic scroll dimensions (`flex-shrink > 0` + clipping).
+- `LINT-SIBLING-OVERLAP`: Direct sibling or interactive descendant-vs-uncle bounding-box overlaps (detects negative-margin bleed while ignoring `pointer-events: none` swipe layers).
+- `LINT-SVG-TEXT-OVERLAP`: SVG/ERD label collisions against labels, `.erd-card`/`.erd-node`, and non-pill `<rect>` elements (exempts `.erd-lbl-bg` and `<g class="erd-edge-lbl">` pills).
+- `LINT-TEXT-CLIPPED`: Unintentional clipped vertical/horizontal text (exempts `-webkit-line-clamp` and intentional single-line ellipsis).
+- `LINT-VIEWPORT-BLEED-X`: Horizontal root or unclipped child overflow beyond viewport bounds (exempts parked offscreen fixed drawers).
+
+Try the self-contained mobile inbox broken-vs-fixed demo in [examples/layout-linter/](examples/layout-linter/) (`run_lint_demo.py` + [sample_report.json](examples/layout-linter/sample_report.json)).
+
 ---
 
 ## Repository Layout
 
 ```text
-blindui.js               # Readable ES2020 Safe-DOM, Safe-Markdown, editor, modal, and API runtime
-blindui.min.js           # Deterministic minified core production bundle (27,735 bytes, < 28 KB)
-blindui-kit.js           # Readable ES2020 standardized 8-primitive component kit (BlindUI.kit)
-blindui-kit.min.js       # Deterministic minified component kit bundle (8,164 bytes, <= 8 KB)
-blindui-tokens.css       # Obsidian design token & component utility stylesheet (4,094 bytes, <= 4 KB)
-build_blindui.py         # Zero-dependency deterministic ES2020 minifier & bundle/token verifier (--check)
-blindui_check.py         # Static UI-to-server contract & XSS hygiene validator (rules BUI-01..BUI-10)
-test_blindui.mjs         # Zero-dep Node.js core test suite (32 tests across source + minified bundles)
-test_blindui_kit.mjs     # Zero-dep Node.js kit test suite (19 tests across source + minified bundles + budgets)
-test_blindui_check.py    # Python unittest suite for blindui_check.py (15 static analysis tests)
-test_blindui_browser.py  # Headless Chrome desktop + mobile touch click-anywhere parity test (optional Playwright)
-LICENSE                  # Apache License, Version 2.0
-NOTICE                   # Attribution and trademark notice
+blindui.js                    # Readable ES2020 Safe-DOM, Safe-Markdown, editor, modal, and API runtime
+blindui.min.js                # Deterministic minified core production bundle (27,735 bytes, < 28 KB)
+blindui-kit.js                # Readable ES2020 standardized 8-primitive component kit (BlindUI.kit)
+blindui-kit.min.js            # Deterministic minified component kit bundle (8,164 bytes, <= 8 KB)
+blindui-layout-lint.js        # Readable ES2020 runtime DOM/SVG layout & overlap auditor (BlindUI.lintLayout)
+blindui-layout-lint.min.js    # Deterministic minified layout linter bundle (8,112 bytes, <= 8 KB)
+blindui-tokens.css            # Obsidian design token & component utility stylesheet (4,094 bytes, <= 4 KB)
+build_blindui.py              # Zero-dependency deterministic ES2020 minifier & bundle/token verifier (--check)
+blindui_check.py              # Static UI-to-server contract, XSS & CSS layout validator (rules BUI-01..BUI-11)
+examples/layout-linter/       # Broken vs. fixed mobile inbox HTML demo, Playwright runner & sample JSON report
+test_blindui.mjs              # Zero-dep Node.js core test suite (32 tests across source + minified bundles)
+test_blindui_kit.mjs          # Zero-dep Node.js kit test suite (19 tests across source + minified bundles + budgets)
+test_blindui_layout_lint.mjs  # Zero-dep Node.js layout linter suite across source + minified bundles (5 rules + pills)
+test_blindui_check.py         # Python unittest suite for blindui_check.py (BUI-01..BUI-11 counterfactuals)
+test_blindui.py               # Python suite verifying build budgets, static BUI-11 & layout-linter demo
+test_blindui_browser.py       # Headless Chrome desktop + mobile touch click-anywhere parity test (optional Playwright)
+LICENSE                       # Apache License, Version 2.0
+NOTICE                        # Attribution and trademark notice
 ```
 
 ---
@@ -129,10 +148,16 @@ node test_blindui.mjs
 # 3. Run component kit, icon, XSS escaping, single-flight lock, and budget suite (19/19 tests)
 node --test test_blindui_kit.mjs
 
-# 4. Run static security & route-parity analyzer suite (15/15 tests)
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_blindui_check.py
+# 4. Run runtime DOM/SVG layout linter counterfactual & budget suite
+node --test test_blindui_layout_lint.mjs
 
-# 5. Run real-browser desktop + mobile click-anywhere parity suite (requires Playwright + Chromium)
+# 5. Run static security, route-parity, and BUI-11 layout analyzer suites
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest test_blindui_check.py test_blindui.py
+
+# 6. Run layout linter broken-vs-fixed mobile inbox browser demo (requires Playwright + Chromium)
+PYTHONDONTWRITEBYTECODE=1 python3 examples/layout-linter/run_lint_demo.py
+
+# 7. Run real-browser desktop + mobile click-anywhere parity suite (requires Playwright + Chromium)
 PYTHONDONTWRITEBYTECODE=1 python3 test_blindui_browser.py
 ```
 

@@ -369,6 +369,63 @@ class TestBlindUiCheckCounterfactuals(unittest.TestCase):
         rep3 = bc.check_app(ui_p3, srv_p3, "social")
         self.assertTrue(rep3["ok"], rep3["findings"])
 
+    def test_bui_11_layout_guards_counterfactuals(self) -> None:
+        # 1. Flex-scroll column child with overflow: hidden lacking flex-shrink: 0 (JS appendChild edge)
+        bad_flex_css = (
+            "<style>"
+            ".msg-list { display: flex; flex-direction: column; overflow-y: auto; padding: 0 0 144px; }"
+            ".msg-swipe-wrap { display: block; overflow: hidden; }"
+            "</style>"
+        )
+        bad_flex_body = bad_flex_css + '<div id="inbox-list" class="msg-list"></div>'
+        bad_flex_js = (
+            "function renderRows() {\n"
+            "  const listEl = document.getElementById('inbox-list');\n"
+            "  const wrap = document.createElement('div');\n"
+            "  wrap.className = 'msg-swipe-wrap';\n"
+            "  listEl.appendChild(wrap);\n"
+            "}\n"
+        )
+        ui_b1, srv_b1 = self._write_pair(_make_clean_ui_py(body_extra=bad_flex_body, js_extra=bad_flex_js), _make_clean_server_py())
+        rep_b1 = bc.check_app(ui_b1, srv_b1, "mail")
+        self.assertIn("BUI-11", self._rules(rep_b1))
+        self.assertTrue(any(f.get("suggested_fix") for f in rep_b1["findings"] if f["rule"] == "BUI-11"))
+
+        good_flex_body = bad_flex_body.replace(
+            ".msg-swipe-wrap { display: block; overflow: hidden; }",
+            ".msg-swipe-wrap { display: block; flex-shrink: 0; overflow: hidden; }",
+        )
+        ui_g1, srv_g1 = self._write_pair(_make_clean_ui_py(body_extra=good_flex_body, js_extra=bad_flex_js), _make_clean_server_py())
+        rep_g1 = bc.check_app(ui_g1, srv_g1, "mail")
+        self.assertNotIn("BUI-11", self._rules(rep_g1))
+
+        # 2. Negative margin on interactive .star-btn fails; margin: 0 passes; decorative .profile-avatar-row passes
+        neg_body = "<style>.star-btn { min-width: 44px; margin: -10px -8px -10px 0; }</style>"
+        ui_b2, srv_b2 = self._write_pair(_make_clean_ui_py(body_extra=neg_body), _make_clean_server_py())
+        rep_b2 = bc.check_app(ui_b2, srv_b2, "mail")
+        self.assertIn("BUI-11", self._rules(rep_b2))
+
+        clean_neg_body = "<style>.star-btn { min-width: 44px; margin: 0; } .profile-avatar-row { margin-top: -34px; }</style>"
+        ui_g2, srv_g2 = self._write_pair(_make_clean_ui_py(body_extra=clean_neg_body), _make_clean_server_py())
+        rep_g2 = bc.check_app(ui_g2, srv_g2, "mail")
+        self.assertNotIn("BUI-11", self._rules(rep_g2))
+
+        # 3. Fixed bottom FAB with list scroll container missing bottom padding clearance fails; safe clearance passes
+        fab_bad_body = (
+            "<style>"
+            ".msg-list { display: flex; flex-direction: column; overflow-y: auto; padding: 0 0 8px; }"
+            ".mobile-compose-fab { position: fixed; right: 16px; bottom: 20px; }"
+            "</style>"
+        )
+        ui_b3, srv_b3 = self._write_pair(_make_clean_ui_py(body_extra=fab_bad_body), _make_clean_server_py())
+        rep_b3 = bc.check_app(ui_b3, srv_b3, "mail")
+        self.assertIn("BUI-11", self._rules(rep_b3))
+
+        fab_good_body = fab_bad_body.replace("padding: 0 0 8px;", "padding: 0 0 calc(144px + env(safe-area-inset-bottom));")
+        ui_g3, srv_g3 = self._write_pair(_make_clean_ui_py(body_extra=fab_good_body), _make_clean_server_py())
+        rep_g3 = bc.check_app(ui_g3, srv_g3, "mail")
+        self.assertNotIn("BUI-11", self._rules(rep_g3))
+
     def test_cli_json_exit_codes(self) -> None:
         ui_p, srv_p = self._write_pair(_make_clean_ui_py(), _make_clean_server_py())
         proc = subprocess.run(
