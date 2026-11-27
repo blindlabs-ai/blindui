@@ -68,7 +68,7 @@
     F = (b, f) => {
       if (!b || !G(f)) return;
       let i = b.id, y;
-      if (i && R.document?.getElementById?.(i) === b && X.bindAction) return X.bindAction(i, f, "click", { lock: true });
+      if (i && R.document?.getElementById?.(i) == b && X.bindAction) return X.bindAction(i, f, "click", { lock: !0 });
       b.addEventListener?.("click", async (e) => {
         if (y) return;
         y = 1;
@@ -84,6 +84,14 @@
         E(N, tx(a.label, "IDLE"))
       ))
     ),
+    xh = (t, p, ...k) => X.h(t, p, ...k),
+    lc = (s) => S(s).toLowerCase(),
+    op = (o) => P(o) ? { value: o } : O(o),
+    TM = { b: "strong", i: "em", h5: "h4", h6: "h4" },
+    NM = { class: "className" },
+    BO = /^(disabled|checked|readOnly|hidden|selected|required|multiple|open|noValidate|spellcheck)$/,
+    VT = /^(id|class|style|x|y|dx|dy|fill|stroke|transform|font-|text-|dominant-|opacity|data-|aria-)/,
+    _nm = "colSpan rowSpan tabIndex readOnly noValidate maxLength minLength formAction viewBox preserveAspectRatio".split(" ").map((k) => (NM[lc(k)] = k)),
     Z = {
       version: "1.0.0",
       icon: (i, n) => {
@@ -293,9 +301,165 @@
           return z;
         });
         return i;
+      },
+      bindTactileList: (c, a) => {
+        a = O(a);
+        let hm = a.holdMs ?? 380, dp = a.driftPx ?? 10, th = a.swipeThresholdPx ?? 76, mx = a.maxSwipePx ?? 118, df = a.dampFactor ?? .35,
+          sel = a.selected instanceof Set ? a.selected : new Set(I(a.selected) ? a.selected : []),
+          { abs: ab, min: mn, round: rn } = Math, tp = "tactile-press", sws = "swiping", cl = [], tm = setTimeout,
+          ev = (e, k, f, p) => e?.[(p == 2 ? "remove" : "add") + "EventListener"]?.(k, f, p < 2 ? { passive: !!p } : N),
+          nt = (i) => a.onSelectChange?.(sel, i),
+          tg = (i) => { if (i == N || i === "") return false; let u = !sel.has(i); u ? sel.add(i) : sel.delete(i); nt(i); return u; },
+          bR = (w, r, it) => {
+            if (!r) return;
+            let ds = r.dataset, rl = r.classList, wl = w?.classList, id = G(a.getId) ? a.getId(it ?? r) : P(it) ? it : it?.id ?? ds?.id ?? "", sx = 0, sy = 0, dx = 0, sw = 0, sc = 0, lp = 0, hs = 0, ti = N, ac = 0,
+              ok = (f) => !G(f) || !!f(it, r), ch = () => ti != N && (clearTimeout(ti), ti = N), up = () => rl?.remove(tp),
+              rs = () => { rl?.remove(sws, tp); wl?.remove(sws + "-right", sws + "-left", "swipe-armed"); r.style && (r.style.transform = ""); },
+              t1 = (e) => e?.touches?.length === 1 && e.touches[0],
+              fl = (k, ms) => ds && (ds[k] = "1", tm(() => { delete ds[k]; }, ms)),
+              ts = (e) => {
+                let t = t1(e); if (!t || !ok(a.isEnabled)) return;
+                sx = t.clientX; sy = t.clientY; dx = sw = sc = lp = hs = 0; ac = 1; rl?.add(tp); ch();
+                ti = tm(() => { ti = N; if (!ac || sw || sc) return; lp = 1; up(); fl("justLongPressed", 420); a.onHaptic?.("medium"); G(a.onLongPress) ? a.onLongPress(id, it, r) : tg(id); }, hm);
+              },
+              tv = (e) => {
+                let t = ac && t1(e); if (!t) return;
+                let rx = t.clientX - sx, ry = t.clientY - sy;
+                if (!sw && !sc) {
+                  (ab(rx) > dp || ab(ry) > dp) && ch();
+                  if (ab(ry) > 12 && ab(ry) > ab(rx)) return (sc = 1, up());
+                  if (ab(rx) > 14 && ab(rx) > ab(ry) * 1.25) { sw = 1; up(); rl?.add(sws); }
+                }
+                if (!sw || lp) return;
+                let aR = ok(a.canSwipeRight), aL = ok(a.canSwipeLeft), ad = ab(rx = rx > 0 ? (aR ? rx : 0) : aL ? rx : 0);
+                dx = ad <= th ? rx : (rx < 0 ? -1 : 1) * mn(mx, th + (ad - th) * df);
+                let ar = ab(dx) >= th;
+                ar && !hs ? (hs = 1, a.onHaptic?.("light")) : !ar && hs && ab(dx) < th - 4 && (hs = 0);
+                r.style && (r.style.transform = "translateX(" + rn(dx) + "px)");
+                wl && (wl.toggle(sws + "-right", dx > 18 && aR), wl.toggle(sws + "-left", dx < -18 && aL), wl.toggle("swipe-armed", ar));
+                ab(dx) > 14 && e.cancelable !== false && e.preventDefault?.();
+              },
+              te = () => {
+                if (!ac) return; ac = 0; ch(); up();
+                if (!sw) return rs();
+                let fx = dx, dir = fx > 0 ? "Right" : "Left", okD = ok(a["canSwipe" + dir]); rs();
+                if (ab(fx) < th || !okD) return;
+                fl("justSwiped", 320);
+                a["onSwipe" + dir]?.(id, (f) => G(f) ? f() : a.onUndo?.(id, it, lc(dir)), it, r);
+              },
+              tc0 = () => { ac = 0; ch(); rs(); },
+              ls = [["start", ts, 1], ["move", tv, 0], ["end", te, 1], ["cancel", tc0, 1]],
+              avE = a.bindAvatar !== false && r.querySelector?.(tx(a.avatarSelector, ".avatar,[data-tactile-avatar]")),
+              avF = avE && ((e) => { e?.stopPropagation?.(); tg(id); a.onHaptic?.("light"); });
+            ls.map(([k, f, p]) => ev(r, "touch" + k, f, p));
+            avE && ev(avE, "click", avF, 1);
+            cl.push(() => { ch(); ls.map(([k, f]) => ev(r, "touch" + k, f, 2)); avE && ev(avE, "click", avF, 2); });
+          };
+        if (c && P(a.rowSelector) && G(c.querySelectorAll)) for (let r of c.querySelectorAll(a.rowSelector)) bR(r.parentNode, r, r.dataset?.id ?? r);
+        return { selected: sel, toggle: tg, clear: () => (sel.clear(), nt(N)), selectAll: (xs) => ((xs || []).map((x) => sel.add(x)), nt(N)), bindRow: bR, destroy: () => cl.splice(0).map((f) => f()) };
+      },
+      pillSelect: (a) => {
+        a = O(a);
+        let m = !!a.multi, vs = new Set(m && I(a.values) ? a.values : a.value != N ? [a.value] : []),
+          cc = tx(a.chipClass, "bui-tab"), ac = tx(a.activeClass, "bui-on"), dk = tx(a.dataKey, "val"), ap = "aria-pressed", bs = [];
+        return M(a.mount, H("div", [a.id, tx(a.className, ".row"), a.attrs], a.label && E(sm, S(a.label)), L(a.options, []).map((o) => {
+          o = op(o); let v = S(o.value ?? o.id ?? o.label ?? ""), on = o.active === !0 || vs.has(v),
+            b = K(N, N, S(o.label ?? v), () => { m && vs.has(v) ? vs.delete(v) : (!m && vs.clear(), vs.add(v)); bs.map(([x, xv, u = vs.has(xv)]) => (sa(x, ap, S(u)), x.classList?.toggle(ac, u))); a.onChange?.(m ? [...vs] : v, o); }, A({ className: cc + (o.cls ? " " + o.cls : "") + (on ? " " + ac : ""), [ap]: S(on) }, o.attrs, a.dataAct && { "data-act": S(a.dataAct) }, dk && { ["data-" + dk]: v }));
+          return (bs.push([b, v]), b);
+        })));
+      },
+      paramField: (a) => {
+        a = O(a);
+        let t = tx(a.type, "text"), v = a.value,
+          ip = A({ id: a.id || N, className: tx(a.inputClass, "bui-input"), "aria-label": a.ariaLabel || N }, a.attrs,
+            a.dataParam && { "data-param": S(a.dataParam) }, v != N && { value: S(v) },
+            G(a.onChange) && { onchange: (e) => a.onChange(e.target?.value, e) }, G(a.onInput) && { oninput: (e) => a.onInput(e.target?.value, e) });
+        "name placeholder min max step rows".split(" ").map((k) => a[k] != N && (ip[k] = S(a[k])));
+        let el = t == "select" ? xh("select", ip, L(a.options, []).map((o) => { o = op(o); let x = S(o.value ?? o.label ?? ""); return xh("option", { value: x, selected: v != N && S(v) == x }, S(o.label ?? x)); }))
+          : t == "textarea" ? xh("textarea", ip, v != N ? S(v) : "") : xh("input", A(ip, { type: t }));
+        return M(a.mount, D(tx(a.className, ".col"), a.label && H("label", [N, ".sm", { for: a.id || N }], S(a.label)), el));
+      },
+      railCard: (a) => {
+        a = O(a);
+        return M(a.mount, D([a.id, tx(a.className, ".card") + (a.active ? " active" : ""), A({}, a.attrs, G(a.onSelect) && { onclick: (e) => a.onSelect(a, e) })],
+          D(rb, H("strong", N, tx(a.name || a.title)), a.status && E(tx(a.statusCls, ".pill"), S(a.status))),
+          a.subtitle && D(sm, S(a.subtitle)),
+          I(a.stats) && a.stats.map((x) => P(x) ? D(".sm", x) : D(rb + " .sm", E(".muted", tx(x.label)), E(".num", tx(x.value)))),
+          a.badge && D(".sm", S(a.badge)),
+          a.actionLabel && K(N, N, S(a.actionLabel), G(a.onAction) && ((e) => (e?.stopPropagation?.(), a.onAction(a, e))), a.actionAttrs)
+        ));
+      },
+      stepTracker: (ls, idx, a) => {
+        a = O(a);
+        let ai = B(idx) ? idx : -1;
+        return M(a.mount, D([a.id, tx(a.className, ".col")], L(ls, []).map((s, i) => {
+          s = O(s); let q = s.state || (ai < 0 ? "" : i < ai ? "done" : i == ai ? "active" : "todo");
+          return D([N, tx(a.itemClass, ".card") + (s.cls ? " " + s.cls : "") + (q ? " " + q : ""), { "data-step-state": q || N }],
+            D(".row", E(".num", S(s.num ?? i + 1)), s.code && H("code", s.codeCls || ".mono", S(s.code)), H("strong", N, tx(s.title, "Step " + (i + 1)))),
+            s.headerName && D(".mono .sm", S(s.headerName) + ": " + tx(s.headerVal)),
+            s.meta && D(sm, S(s.meta))
+          );
+        })));
+      },
+      mountSafe: (el, v) => {
+        if (!el) return el;
+        let d = el.ownerDocument || R.document, tn = (x) => d.createTextNode(x), oe = Object.entries,
+          ap = (ns) => el.replaceChildren ? el.replaceChildren(...ns) : (st(el, ""), ns.map((n) => el.appendChild(n)));
+        if (v == N || v === "") return (ap([]), el);
+        if (T(v)) return (ap([v]), el);
+        if (I(v)) return (ap(v.filter((x) => x != N && x !== false).map((x) => T(x) ? x : tn(S(x)))), el);
+        let rn = [], sk = N, st0 = [{ c: rn, svg: /svg/i.test(el.namespaceURI + el.tagName), t: "" }],
+          top = () => st0[st0.length - 1],
+          push = (n) => { let y = top(); y.c ? y.c.push(n) : y.n.appendChild(n); },
+          dc = (t) => t.replace(/&(#\d+|#x[\da-f]+|[a-z]+);/gi, (m, k) => k[0] == "#" ? S.fromCharCode(+(k[1] == "x" || k[1] == "X" ? "0" + k.slice(1) : k.slice(1))) : ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\xa0" }[lc(k)] || m)),
+          ps = (t) => { let o = {}; S(t).replace(/([a-z-]+)\s*:\s*([^;]+)/gi, (_, k, val) => { val = val.trim(); val && !/url\s*\(|expression\s*\(|javascript:/i.test(val) && (o[lc(k).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = val); }); return o; },
+          re = /<!--[\s\S]*?-->|<\/([a-z][\w:-]*)\s*>|<([a-z][\w:-]*)([^<>]*)>|([^<]+|<)/gi, m;
+        while ((m = re.exec(S(v)))) {
+          if (m[4]) { !sk && push(tn(dc(m[4]))); continue; }
+          if (m[1]) {
+            let ct = lc(m[1]);
+            if (sk) { ct == sk && (sk = N); continue; }
+            for (let k = st0.length, mt = TM[ct] || ct; --k > 0;) if (st0[k].t == mt) { st0.length = k; break; }
+            continue;
+          }
+          if (!m[2] || sk) continue;
+          let t = lc(m[2]), as = m[3] || "", sc = /\/\s*$/.test(as);
+          sc && (as = as.replace(/\/\s*$/, ""));
+          if (/^(script|style|iframe|object|embed|template)$/.test(t)) { !sc && (sk = t); continue; }
+          let inSvg = top().svg || t == "svg", pr = {}, ar = /([a-z_:][\w:.-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gi, am, nd;
+          while ((am = ar.exec(as))) {
+            let kl = lc(am[1]), dv = dc(am[2] ?? am[3] ?? am[4] ?? "");
+            if (/^on/.test(kl) || kl == "srcdoc" || inSvg && /href/i.test(kl)) continue;
+            if (kl == "style") { let so = ps(dv); for (let _ in so) pr.style = so; }
+            else if (inSvg) pr[NM[kl] || kl] = dv;
+            else {
+              let nk = NM[kl] || kl;
+              if (BO.test(nk)) pr[nk] = true;
+              else if (/^(href|src|action|formAction)$/.test(nk)) { let u = X.sanitizeUrl(dv, { allowRelative: true }); u && (pr[nk] = u); }
+              else pr[nk] = dv;
+            }
+          }
+          if (inSvg) {
+            if (t == "text" || t == "tspan") {
+              nd = d.createElementNS("http://www.w3.org/2000/svg", t);
+              for (let [k, val] of oe(pr)) VT.test(k) && (k == "style" ? A(nd.style, val) : sa(nd, k, S(val)));
+            } else { try { nd = X.svg(t, pr); } catch { continue; } }
+            push(nd); !sc && st0.push({ n: nd, svg: 1, t: t });
+          } else {
+            let ht = TM[t] || t;
+            try { nd = xh(ht, pr); } catch {
+              let ok = {};
+              try { xh(ht, {}); } catch { continue; }
+              for (let [k, val] of oe(pr)) try { xh(ht, { [k]: val }); ok[k] = val; } catch {}
+              nd = xh(ht, ok);
+            }
+            push(nd); !sc && !/^(br|hr|input|img|col|meta|link)$/.test(ht) && st0.push({ n: nd, svg: 0, t: ht });
+          }
+        }
+        return (ap(rn), el);
       }
     };
 
-  X && (X.kit = Z);
+  X && (X.kit = Z, "bindTactileList pillSelect paramField railCard stepTracker mountSafe".split(" ").map((k) => (X[k] = Z[k])));
   typeof module < "u" && module?.exports && (module.exports = Z);
 })(globalThis);

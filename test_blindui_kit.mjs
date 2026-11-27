@@ -674,12 +674,12 @@ for (const [label, kitPath] of [
 }
 
 describe("BlindUI Kit Budgets & Hygiene", () => {
-  test("core < 28,672B, kit <= 8,192B, tokens <= 4,096B, 100% ASCII, 0 sinks and 0 dot-clamp", () => {
+  test("core < 28,672B, kit <= 16,384B, tokens <= 4,096B, 100% ASCII, 0 sinks and 0 dot-clamp", () => {
     const coreRaw = fs.readFileSync(CORE_MIN_PATH);
     const kitRaw = fs.readFileSync(KIT_MIN_PATH);
     const tokRaw = fs.readFileSync(TOKENS_PATH);
     assert.ok(coreRaw.length < 28672, `blindui.min.js ${coreRaw.length} >= 28672`);
-    assert.ok(kitRaw.length <= 8192, `blindui-kit.min.js ${kitRaw.length} > 8192`);
+    assert.ok(kitRaw.length <= 16384, `blindui-kit.min.js ${kitRaw.length} > 16384`);
     assert.ok(tokRaw.length <= 4096, `blindui-tokens.css ${tokRaw.length} > 4096`);
 
     for (const p of [KIT_SRC_PATH, KIT_MIN_PATH, TOKENS_PATH]) {

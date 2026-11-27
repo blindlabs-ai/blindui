@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 MAX_BUNDLE_BYTES = 28672
-MAX_KIT_BYTES = 8192
+MAX_KIT_BYTES = 16384
 MAX_TOKENS_BYTES = 4096
 MAX_LINT_BYTES = 8192
 

@@ -1,6 +1,6 @@
 # Maat (formerly Zero-UI / BlindUI)
 
-Standalone zero-dependency, Feather-of-Truth web substrate: `28 KB` (`27,742` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `8 KB` (`8,169` bytes minified) standardized component kit, `8 KB` (`8,130` bytes minified) DOM/SVG layout & overlap linter, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, self-immune static validator (`MAAT-01..MAAT-16`), and single-bundle app synthesizer (`maat_forge.py`) by [Blind Labs](https://blindlabs.ai).
+Standalone zero-dependency, Feather-of-Truth web substrate: `28 KB` (`27,742` bytes minified) Safe-DOM and linear-time Safe-Markdown ES2020 browser runtime, `16 KB` (`16,351` bytes minified) standardized component kit & intrinsics (`bindTactileList`, `pillSelect`, `paramField`, `railCard`, `stepTracker`, `mountSafe`), `8 KB` (`8,130` bytes minified) DOM/SVG layout & overlap linter, `4 KB` (`4,094` bytes) obsidian design token stylesheet, deterministic minifier, self-immune static validator (`MAAT-01..MAAT-16`), and single-bundle app synthesizer (`maat_forge.py`) by [Blind Labs](https://blindlabs.ai).
 
 `window.Maat` and `window.BlindUI` (as well as `maat_check.py` / `blindui_check.py` and `build_maat.py` / `build_blindui.py`) are 100% backwards-compatible aliases (`window.Maat === window.BlindUI`).
 
@@ -9,7 +9,7 @@ Standalone zero-dependency, Feather-of-Truth web substrate: `28 KB` (`27,742` by
 | **Website** | https://blindlabs.ai |
 | **Repository** | https://github.com/blindlabs-ai/zero-ui |
 | **Core Bundle** | `27,742` bytes (`maat.min.js` / `blindui.min.js`, verified `< 28 KB` hard budget) |
-| **Component Kit** | `8,169` bytes (`maat-kit.min.js` / `blindui-kit.min.js`, verified `<= 8 KB` hard budget) |
+| **Component Kit** | `16,351` bytes (`maat-kit.min.js` / `blindui-kit.min.js`, verified `<= 16 KB` hard budget) |
 | **Layout Linter** | `8,130` bytes (`maat-layout-lint.min.js` / `blindui-layout-lint.min.js`, verified `<= 8 KB` hard budget) |
 | **Design Tokens** | `4,094` bytes (`maat-tokens.css` / `blindui-tokens.css`, verified `<= 4 KB` hard budget) |
 | **Runtime Dependencies** | `0` `npm` packages, `0` `pip` packages (pure ES2020 + Python 3 stdlib) |
@@ -23,7 +23,7 @@ Standalone zero-dependency, Feather-of-Truth web substrate: `28 KB` (`27,742` by
 
 Every Maat artifact is weighed against strict deterministic budgets before shipping:
 
-- **Featherweight Byte Ceilings:** Core runtime `< 28 KB`, component kit `<= 8 KB`, DOM/SVG layout linter `<= 8 KB`, and obsidian tokens `<= 4 KB` -- deterministically minified and byte-synced with `blindui*` compatibility mirrors via `build_maat.py`.
+- **Featherweight Byte Ceilings:** Core runtime `< 28 KB`, component kit `<= 16 KB`, DOM/SVG layout linter `<= 8 KB`, and obsidian tokens `<= 4 KB` -- deterministically minified and byte-synced with `blindui*` compatibility mirrors via `build_maat.py`.
 - **Synchronous Frame-1 Boot (`< 15 ms`):** No `async` boot waterfalls or blocking network/crypto calls before first paint (`MAAT-12`).
 - **Safe-DOM & Strict CSP Portability (`MAAT-01`, `MAAT-14`):** Allowlisted `Maat.h`, `Maat.svg`, `Maat.md`, and `Maat.sanitizeUrl` eliminate raw HTML injection sinks, third-party CDNs, external `<img>` loads, and `<iframe>` embeds.
 - **Bespoke Visual Identity & Tactile Mobile Safety (`MAAT-11`, `MAAT-13`, `MAAT-15`):** Rejects trademark palette/SVG clones, enforces `flex-shrink: 0` + touch containment on mobile scroll/swipe rows, and requires collision-free pill labels on SVG/ERD diagrams.
@@ -49,7 +49,7 @@ Load `maat.min.js` alongside `maat-tokens.css`, `maat-kit.min.js`, and `maat-lay
     { className: "bui-col" },
     kit.kpiStrip([
       { label: "Core Bundle", value: "27,742 B", tone: "ok", sub: "< 28 KB budget" },
-      { label: "Kit Bundle", value: "8,169 B", tone: "ok", sub: "<= 8 KB budget" },
+      { label: "Kit Bundle", value: "16,351 B", tone: "ok", sub: "<= 16 KB budget" },
       { label: "Layout Linter", value: "8,130 B", tone: "ok", sub: "<= 8 KB budget" },
       { label: "CSS Tokens", value: "4,094 B", tone: "ok", sub: "<= 4 KB budget" }
     ]),
@@ -100,7 +100,10 @@ Supported archetypes: `tactile-inbox`, `workspace-drive`, `sql-studio`, and `ope
 | `bindAction(id, fn, event?)` | Bind an event handler by element ID and register the binding for static `MAAT-04` (`BUI-04`) verification |
 | `bindGroup(selector, fn, event?)` | Delegate events cleanly across matching child elements without inline event attributes |
 | `defineRoutes(map)` / `api(route, opts?)` | Declare typed client route schemas and execute schema-checked, optionally signed `fetch` calls |
-| `kit.*` | Eight Safe-DOM primitives (`icon`, `shell`, `kpiStrip`, `stepRail`, `keyCard`, `codeBlock`, `statusPill`, `tryItPanel`) |
+| `kit.*` | Fourteen Safe-DOM primitives & intrinsics (`icon`, `shell`, `kpiStrip`, `stepRail`, `keyCard`, `codeBlock`, `statusPill`, `tryItPanel`, `bindTactileList`, `pillSelect`, `paramField`, `railCard`, `stepTracker`, `mountSafe`) |
+| `bindTactileList(el, opts)` | Mobile tactile touch-hold (`380 ms`), drift-guarded elastic swipe (`76 px`/`118 px`/`0.35`), avatar multi-select, and undo callback controller |
+| `pillSelect` / `paramField` / `railCard` / `stepTracker` | Safe-DOM interactive pill/chip selector, labeled form fields, settlement rail cards, and ordered protocol step cards |
+| `mountSafe(el, markupOrNode)` | Zero-`innerHTML` allowlist HTML+SVG tokenizer and Safe-DOM mounter via `Maat.h` / `Maat.svg` / `replaceChildren()` |
 | `lintLayout(root?, opts?)` | Live DOM/SVG geometry auditor (`LINT-FLEX-SHRINK-CLIP`, `LINT-SIBLING-OVERLAP`, `LINT-SVG-TEXT-OVERLAP`, `LINT-TEXT-CLIPPED`, `LINT-VIEWPORT-BLEED-X`) |
 
 ### Static Validator Rules (`MAAT-01..MAAT-16` / `BUI-01..BUI-11`)
@@ -123,7 +126,7 @@ See also the mobile inbox layout linter counterfactual walkthrough in [examples/
 
 ```text
 maat.js / maat.min.js                      # Core ES2020 Safe-DOM, Safe-Markdown, editor, modal & API runtime (27,742 B)
-maat-kit.js / maat-kit.min.js              # Standardized 8-primitive component kit (8,169 B)
+maat-kit.js / maat-kit.min.js              # Standardized 14-primitive component kit & intrinsics (16,351 B)
 maat-layout-lint.js / maat-layout-lint.min.js # Runtime DOM/SVG layout & overlap auditor (8,130 B)
 maat-tokens.css                            # Obsidian design token & component utility stylesheet (4,094 B)
 blindui*.js / blindui-tokens.css           # Byte-synced backwards-compatibility mirrors (window.BlindUI === window.Maat)
